@@ -1,0 +1,101 @@
+
+/* =================================
+   GLOBAL VARIABLES
+================================= */
+
+:root {
+  --color-primary: #183d32;
+  --color-secondary: #c6a47a;
+  --color-background: #fbfaf7;
+  --color-text: #26352c;
+  --color-muted: #778078;
+
+  --container-width: 1200px;
+}
+
+/* =================================
+   RESET
+================================= */
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 90px;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, Helvetica, sans-serif;
+  color: var(--color-text);
+  background: var(--color-background);
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* =================================
+   SHARED CONTAINER
+================================= */
+
+.container {
+  width: min(100% - 48px, var(--container-width));
+  margin-inline: auto;
+}
+
+/* =================================
+   COMMON BUTTONS
+================================= */
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 14px 22px;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.2s;
+}
+
+.button-primary {
+  color: white;
+  background: var(--color-primary);
+}
+
+.button-primary:hover {
+  background: #285849;
+  transform: translateY(-2px);
+}
+
+.button-outline {
+  color: var(--color-primary);
+  border: 1px solid var(--color-primary);
+}
+
+/* =================================
+   RESPONSIVE
+================================= */
+
+img {
+  max-width: 100%;
+}
+
+@media (max-width: 600px) {
+  .container {
+    width: min(100% - 32px, var(--container-width));
+  }
+}
