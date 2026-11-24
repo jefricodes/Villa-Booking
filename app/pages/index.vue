@@ -1,6 +1,7 @@
-
 <script setup lang="ts">
-import { villas } from '~/data/villas'
+import { useVillas } from '~/composables/useVillas';
+
+const { villas: villas, pending, error } = useVillas()
 
 const facilities = [
   {
@@ -21,7 +22,7 @@ const facilities = [
   {
     icon: '🍳',
     title: 'Private Kitchen',
-    description: 'Kitchen facilities equipped for you cooking needs.'
+    description: 'Kitchen facilities equipped for your cooking needs.'
   },
   {
     icon: '🚗',
@@ -48,190 +49,156 @@ useHead({
 
 <template>
   <main>
+    <div v-if="pending" class="loading-state">Loading villas...</div>
+    <div v-else-if="error" class="error-state">Failed to load villas. Please try again later.</div>
 
-    <!-- HERO SECTION -->
-    <section id="home" class="hero">
-      <div class="hero-container">
-
-        <div class="hero-content">
-
-          <span class="eyebrow">
-            ✦ YOUR PRIVATE ESCAPE
-          </span>
-
-          <h1>
-            Experience
-            <span>Comfort</span>
-            & Beautiful Living.
-          </h1>
-
-          <p>
-            Discover a different kind of stay. Enjoy comfort, privacy, and an unforgettable holiday atmosphere with us.
-          </p>
-
-          <div class="hero-actions">
-            <a href="#villas" class="button button-primary">
-              Explore Our Villas →
-            </a>
-
-            <a href="#facilities" class="button button-outline">
-              Discover More
-            </a>
-          </div>
-
-          <div class="hero-statistics">
-            <div>
-              <strong>05</strong>
-              <span>Villa Units</span>
-            </div>
-
-            <div>
-              <strong>100%</strong>
-              <span>Private Stay</span>
-            </div>
-
-            <div>
-              <strong>24/7</strong>
-              <span>Guest Support*</span>
-            </div>
-          </div>
-
-        </div>
-
-        <div class="hero-image">
-          <img
-            src="https://images.unsplash.com/photo-1613490493576-7fde63acd811?w=1400"
-            alt="Villa tropis dengan kolam renang"
-          />
-
-          <div class="image-label">
-            <span>✦</span>
-            A Place to Unwind
-          </div>
-        </div>
-
-      </div>
-    </section>
-
-
-    <!-- VILLA SECTION -->
-    <section id="villas" class="villa-section">
-
-      <div class="section-container">
-
-        <div class="section-heading">
-
-          <div>
-            <span class="eyebrow">OUR COLLECTION</span>
-
-            <h2>
-              Find Your Perfect
-              <span>Villa.</span>
-            </h2>
-          </div>
-          <p>
-            Choose a villa that fits the holiday needs of you and your loved ones.
-          </p>
-
-        </div>
-
-
-        <!-- VILLA CARD LIST -->
-        <div class="villa-grid">
-
-          <VillaCard
-            v-for="villa in villas"
-            :key="villa.id"
-            :villa="villa"
-          />
-
-        </div>
-
-      </div>
-
-    </section>
-
-
-    <!-- FACILITIES SECTION -->
-    <section id="facilities" class="facilities-section">
-
-      <div class="section-container">
-
-        <div class="facilities-heading">
-          <span class="eyebrow">OUR FACILITIES</span>
-
-          <h2>
-            Everything You Need
-            <span>To Relax.</span>
-          </h2>
-
-          <p>
-            Various facilities designed for your comfort during your stay.
-          </p>
-        </div>
-
-
-        <div class="facilities-grid">
-
-          <div
-            v-for="facility in facilities"
-            :key="facility.title"
-            class="facility-card"
-          >
-
-            <div class="facility-icon">
-              {{ facility.icon }}
-            </div>
-
-            <h3>
-              {{ facility.title }}
-            </h3>
-
+    <template v-else>
+      <!-- HERO SECTION -->
+      <section id="home" class="hero">
+        <div class="hero-container">
+          <div class="hero-content">
+            <span class="eyebrow">✦ YOUR PRIVATE ESCAPE</span>
+            <h1>
+              Experience
+              <span>Comfort</span>
+              & Beautiful Living.
+            </h1>
             <p>
-              {{ facility.description }}
+              Discover a different kind of stay. Enjoy comfort, privacy, and an unforgettable holiday atmosphere with us.
             </p>
 
+            <div class="hero-actions">
+
+              <NuxtLink to="#booking" class="button button-primary">
+                Book Now →
+              </NuxtLink>
+
+              <NuxtLink to="#villas" class="button button-outline">
+                Explore Our Villas
+              </NuxtLink>
+            </div>
+
+            <div class="hero-statistics">
+              <div>
+                <strong>05</strong>
+                <span>Villa Units</span>
+              </div>
+              <div>
+                <strong>100%</strong>
+                <span>Private Stay</span>
+              </div>
+              <div>
+                <strong>24/7</strong>
+                <span>Guest Support</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="hero-image">
+            <img
+              src="https://images.unsplash.com/photo-1613490493576-7fde63acd811?w=1400"
+              alt="Villa tropis dengan kolam renang"
+            />
+            <div class="image-label">
+              <span>✦</span>
+              A Place to Unwind
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- VILLA SECTION -->
+      <section id="villas" class="villa-section">
+        <div class="section-container">
+          <div class="section-heading">
+            <div>
+              <span class="eyebrow">OUR COLLECTION</span>
+              <h2>Find Your Perfect <span>Villa.</span></h2>
+            </div>
+            <p>
+              Choose a villa that fits the holiday needs of you and your loved ones.
+            </p>
+          </div>
+
+          
+          <div
+            v-if="villas.length === 0"
+            class="empty-villas"
+          >
+            <h3>Belum Ada Villa</h3>
+
+            <p>
+              Saat ini belum ada unit villa yang dapat ditampilkan.
+              Silakan kembali lagi nanti.
+            </p>
+          </div>
+
+          <div v-else class="villa-grid">
+
+            <VillaCard
+              v-for="villa in villas"
+              :key="villa.id"
+              :villa="villa"
+            />
+
           </div>
 
         </div>
+      </section>
 
-      </div>
+      <!-- FACILITIES SECTION -->
+      <section id="facilities" class="facilities-section">
+        <div class="section-container">
+          <div class="facilities-heading">
+            <span class="eyebrow">OUR FACILITIES</span>
+            <h2>Everything You Need <span>To Relax.</span></h2>
+            <p>Various facilities designed for your comfort during your stay.</p>
+          </div>
 
-    </section>
-
-
-    <!-- BOOKING CALL TO ACTION -->
-    <section id="booking" class="booking-section">
-
-      <div class="booking-content">
-
-        <span class="eyebrow">
-          YOUR NEXT HOLIDAY
-        </span>
-
-        <h2>
-          Ready for Your
-          Next Escape?
-        </h2>
-
-        <p>
-          Find your favorite villa and plan your next holiday experience.
-        </p>
-
-        <a href="#villas" class="button button-light">
-          Choose Your Villa →
-        </a>
-
-      </div>
-
-    </section>
-
+          <div class="facilities-grid">
+            <div
+              v-for="facility in facilities"
+              :key="facility.title"
+              class="facility-card"
+            >
+              <div class="facility-icon">{{ facility.icon }}</div>
+              <h3>{{ facility.title }}</h3>
+              <p>{{ facility.description }}</p>
+            </div>
+          </div>
+        </div>
+      </section>
+    </template>
   </main>
 </template>
 
-<style scoped>
-/* HERO */
+<style>
 
+html {
+  scroll-behavior: smooth;
+}
+</style>
+
+<style scoped>
+.empty-villas {
+  padding: 45px 20px;
+  background: white;
+  border: 1px dashed #cbd8cd;
+  border-radius: 12px;
+  text-align: center;
+}
+
+.empty-villas h3 {
+  color: #183d32;
+  font-family: Georgia, serif;
+}
+
+.empty-villas p {
+  color: #778078;
+  font-size: 13px;
+  line-height: 1.7;
+}
+/* HERO */
 .hero {
   padding: 75px 24px 90px;
   background: #f5f6f0;
@@ -247,9 +214,9 @@ useHead({
 }
 
 .eyebrow {
-  color: #a17d54;
-  font-size: 11px;
-  font-weight: bold;
+  color: #967045; 
+  font-size: 12px;
+  font-weight: 700;
   letter-spacing: 2px;
 }
 
@@ -265,22 +232,55 @@ useHead({
 .hero-content h1 span,
 .section-heading h2 span,
 .facilities-heading h2 span {
-  color: #b18a5a;
+  color: #967045; 
   font-style: italic;
 }
 
 .hero-content > p {
   max-width: 480px;
-  color: #778078;
-  font-size: 15px;
-  line-height: 1.9;
+  color: #556058; 
+  font-size: 16px; 
+  line-height: 1.8;
 }
 
 .hero-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 16px; 
   margin-top: 30px;
+}
+
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px 28px;
+  border-radius: 8px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  font-size: 15px;
+}
+
+.button-primary {
+  background: #183d32;
+  color: white;
+}
+
+.button-primary:hover {
+  background: #0f2820;
+}
+
+.button-outline {
+  background: transparent;
+  color: #183d32;
+  border: 2px solid #183d32;
+}
+
+.button-outline:hover {
+  background: #183d32;
+  color: white;
 }
 
 .hero-statistics {
@@ -302,13 +302,9 @@ useHead({
 }
 
 .hero-statistics span {
-  color: #849087;
-  font-size: 11px;
-}
-
-.small-note {
-  margin-top: 12px;
-  font-size: 10px !important;
+  color: #556058;
+  font-size: 12px;
+  font-weight: 500;
 }
 
 .hero-image {
@@ -334,15 +330,15 @@ useHead({
   color: #183d32;
   font-family: Georgia, serif;
   font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
 }
 
 .image-label span {
-  color: #b18a5a;
+  color: #967045;
 }
 
-
 /* VILLA SECTION */
-
 .villa-section {
   padding: 100px 24px;
   background: #fbfaf7;
@@ -372,20 +368,18 @@ useHead({
 
 .section-heading > p {
   max-width: 350px;
-  color: #78837a;
-  font-size: 14px;
+  color: #556058; 
+  font-size: 15px; 
   line-height: 1.8;
 }
 
 .villa-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 25px;
+  gap: 30px; 
 }
 
-
 /* FACILITIES SECTION */
-
 .facilities-section {
   padding: 95px 24px;
   background: #f2f5f0;
@@ -398,48 +392,53 @@ useHead({
 }
 
 .facilities-heading p {
-  color: #778078;
+  color: #556058; 
   line-height: 1.8;
-  font-size: 14px;
+  font-size: 15px; 
 }
 
 .facilities-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
+  gap: 24px; 
 }
 
 .facility-card {
-  padding: 30px;
+  padding: 32px; 
   background: white;
-  border: 1px solid #e9eee9;
+  border: 1px solid #e0e8e0; 
   border-radius: 12px;
+  transition: transform 0.2s ease;
+}
+
+.facility-card:hover {
+  transform: translateY(-4px);
 }
 
 .facility-icon {
-  font-size: 30px;
+  font-size: 32px; 
+  margin-bottom: 16px;
 }
 
 .facility-card h3 {
   color: #183d32;
   font-family: Georgia, serif;
-  font-size: 19px;
+  font-size: 20px; 
+  margin-bottom: 12px;
 }
 
 .facility-card p {
-  color: #778078;
-  font-size: 13px;
+  color: #556058; 
+  font-size: 14px; 
   line-height: 1.7;
 }
 
-
 /* BOOKING SECTION */
-
 .booking-section {
   margin: 80px 24px;
-  padding: 75px 25px;
+  padding: 80px 25px; 
   background: #183d32;
-  border-radius: 15px;
+  border-radius: 16px; 
   text-align: center;
 }
 
@@ -453,45 +452,43 @@ useHead({
   font-family: Georgia, serif;
   font-size: clamp(36px, 5vw, 52px);
   font-weight: 500;
+  margin-bottom: 16px;
 }
 
 .booking-content > p {
-  color: #c4d2c9;
-  font-size: 14px;
+  color: #d4e0d9; 
+  font-size: 16px; 
   line-height: 1.8;
+  margin-bottom: 30px;
 }
 
 .button-light {
-  margin-top: 20px;
+  display: inline-block;
+  padding: 16px 32px;
   color: #183d32;
   background: white;
+  border-radius: 8px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: all 0.2s ease;
 }
 
-.booking-content .booking-note {
-  margin-top: 25px;
-  font-size: 11px;
-  color: #b7c7bc;
+.button-light:hover {
+  background: #f0f0f0;
+  transform: translateY(-2px);
 }
-
 
 /* RESPONSIVE */
-
 @media (max-width: 950px) {
   .hero-container {
     grid-template-columns: 1fr;
     gap: 35px;
   }
-
   .hero-image {
     height: 400px;
   }
-
-  .villa-grid {
+  .villa-grid, .facilities-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .facilities-grid {
-    grid-template-columns: repeat(2, 1fr);
   }
 }
 
@@ -499,34 +496,24 @@ useHead({
   .hero {
     padding-top: 50px;
   }
-
   .hero-image {
     height: 300px;
     border-radius: 80px 10px 10px 10px;
   }
-
   .hero-statistics {
     gap: 20px;
   }
-
   .hero-statistics strong {
     font-size: 21px;
   }
-
   .section-heading {
     flex-direction: column;
     align-items: flex-start;
-    gap: 5px;
+    gap: 15px;
   }
-
-  .villa-grid {
+  .villa-grid, .facilities-grid {
     grid-template-columns: 1fr;
   }
-
-  .facilities-grid {
-    grid-template-columns: 1fr;
-  }
-
   .booking-section {
     margin: 45px 16px;
     padding: 50px 20px;

@@ -99,3 +99,37 @@ img {
     width: min(100% - 32px, var(--container-width));
   }
 }
+
+
+/* =================================
+   ACCESSIBILITY
+================================= */
+
+/* Fokus keyboard yang mudah terlihat */
+
+:focus-visible {
+  outline: 3px solid #b18a5a;
+  outline-offset: 3px;
+}
+
+/* Tombol yang dinonaktifkan */
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+/* Kurangi animasi jika diminta sistem */
+
+@media (prefers-reduced-motion: reduce) {
+
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+}

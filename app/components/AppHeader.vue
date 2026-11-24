@@ -1,9 +1,40 @@
-
 <script setup lang="ts">
+import { ref } from 'vue'
+import { useRoute, navigateTo } from '#app'
+
 const isMenuOpen = ref(false)
+const route = useRoute()
 
 function closeMenu() {
   isMenuOpen.value = false
+}
+
+// PERUBAHAN: Logika navigasi cerdas yang diperbarui
+function handleNavigation(targetId: string) {
+  closeMenu()
+
+  if (route.path === '/') {
+    // --- JIKA SEDANG DI HOMEPAGE ---
+    if (targetId === 'home') {
+      // Scroll ke paling atas halaman dengan mulus
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    } else {
+      // Scroll ke section tertentu
+      const targetElement = document.getElementById(targetId)
+      if (targetElement) {
+        targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }
+    }
+  } else {
+    // --- JIKA SEDANG DI HALAMAN LAIN (MISAL: /booking) ---
+    if (targetId === 'home') {
+      // PERUBAHAN UTAMA: Jika tujuannya 'home', cukup arahkan ke '/' tanpa hash (#)
+      navigateTo('/') 
+    } else {
+      // Jika tujuannya section lain (villas, facilities, booking), tambahkan hash
+      navigateTo(`/#${targetId}`)
+    }
+  }
 }
 </script>
 
@@ -11,14 +42,13 @@ function closeMenu() {
   <header class="header">
     <div class="header-container">
 
-      <!-- Logo -->
-      <NuxtLink to="/" class="brand" @click="closeMenu">
+      <!-- Logo: Klik logo akan selalu kembali ke Home (atas) -->
+      <a href="#home" class="brand" @click.prevent="handleNavigation('home')">
         <span class="brand-icon">V</span>
-
         <span class="brand-name">
           VILLA<span>STAY</span>
         </span>
-      </NuxtLink>
+      </a>
 
       <!-- Navigation -->
       <nav
@@ -26,25 +56,26 @@ function closeMenu() {
         class="navigation"
         :class="{ 'is-open': isMenuOpen }"
       >
-        <a href="#home" @click="closeMenu">
+        <!-- PERUBAHAN: Semua link menggunakan fungsi handleNavigation yang sama -->
+        <a href="#home" @click.prevent="handleNavigation('home')">
           Home
         </a>
 
-        <a href="#villas" @click="closeMenu">
+        <a href="#villas" @click.prevent="handleNavigation('villas')">
           Our Villas
         </a>
 
-        <a href="#facilities" @click="closeMenu">
+        <a href="#facilities" @click.prevent="handleNavigation('facilities')">
           Facilities
         </a>
 
-        <a href="#booking" @click="closeMenu">
-          Contact
-        </a>
+        <NuxtLink to="booking" @click.prevent="handleNavigation('booking')">
+          Book Now
+        </NuxtLink>
       </nav>
 
-      <!-- Booking Button -->
-      <a href="#villas" class="header-booking">
+      <!-- Tombol CTA di Header -->
+      <a href="#booking" class="header-booking" @click.prevent="handleNavigation('booking')">
         Book Your Stay
       </a>
 
@@ -65,6 +96,7 @@ function closeMenu() {
 </template>
 
 <style scoped>
+/* Style tetap sama seperti sebelumnya, tidak ada perubahan di sini */
 .header {
   position: sticky;
   top: 0;
@@ -126,11 +158,28 @@ function closeMenu() {
   color: #59665e;
   text-decoration: none;
   font-size: 14px;
+  font-weight: 500;
   transition: color 0.2s;
+  position: relative;
 }
 
 .navigation a:hover {
-  color: #b18a5a;
+  color: #967045;
+}
+
+.navigation a::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: #967045;
+  transition: width 0.2s ease;
+}
+
+.navigation a:hover::after {
+  width: 100%;
 }
 
 .header-booking {
@@ -141,6 +190,12 @@ function closeMenu() {
   text-decoration: none;
   font-size: 13px;
   font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.header-booking:hover {
+  background: #0f2820;
+  transform: translateY(-1px);
 }
 
 .menu-toggle {
@@ -177,6 +232,10 @@ function closeMenu() {
 
   .navigation a {
     padding: 14px 0;
+  }
+
+  .navigation a::after {
+    display: none;
   }
 
   .header-booking {

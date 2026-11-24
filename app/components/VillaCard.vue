@@ -1,12 +1,22 @@
-
 <script setup lang="ts">
+
+import { computed } from 'vue'
 import type { Villa } from '~/types/villa'
 import { formatRupiah } from '~/utils/formatRupiah'
 
-// Menerima data villa dari parent component
 const props = defineProps<{
   villa: Villa
 }>()
+
+
+const displayedAmenities = computed(() => {
+  return props.villa.amenities?.slice(0, 3) || []
+})
+
+const remainingAmenitiesCount = computed(() => {
+  const total = props.villa.amenities?.length || 0
+  return total > 3 ? total - 3 : 0
+})
 </script>
 
 <template>
@@ -36,6 +46,7 @@ const props = defineProps<{
         {{ props.villa.name }}
       </h3>
 
+      <!-- PERUBAHAN 4: Tingkatkan kontras dan ukuran font untuk readability -->
       <p class="villa-description">
         {{ props.villa.description }}
       </p>
@@ -53,12 +64,18 @@ const props = defineProps<{
 
       <!-- Amenities -->
       <div class="villa-amenities">
+        <!-- PERUBAHAN 5: Gunakan computed property 'displayedAmenities', BUKAN props.villa.amenities.slice(0, 3) -->
         <span
-          v-for="amenity in props.villa.amenities.slice(0, 3)"
+          v-for="amenity in displayedAmenities"
           :key="amenity"
           class="amenity"
         >
           {{ amenity }}
+        </span>
+        
+        <!-- PERUBAHAN 6: Tampilkan info jika ada amenities yang tersembunyi -->
+        <span v-if="remainingAmenitiesCount > 0" class="amenity-more">
+          + {{ remainingAmenitiesCount }} lainnya
         </span>
       </div>
 
@@ -69,13 +86,16 @@ const props = defineProps<{
           <strong>
             {{ formatRupiah(props.villa.pricePerNight) }}
           </strong>
-
+          <!-- PERUBAHAN 7: Perbaiki kontras warna dan ukuran font -->
           <span>/ night</span>
         </div>
 
-        <a href="#booking" class="villa-button">
-          Book Now ↗
-        </a>
+      <NuxtLink
+        :to="`/villas/${props.villa.slug}`"
+        class="villa-button"
+      >
+        View Details ↗
+      </NuxtLink>
 
       </div>
 
@@ -126,6 +146,7 @@ const props = defineProps<{
   border-radius: 6px;
   font-size: 11px;
   font-weight: 700;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05); /* PERUBAHAN: Tambah sedikit shadow agar lebih terbaca */
 }
 
 .villa-content {
@@ -133,10 +154,11 @@ const props = defineProps<{
 }
 
 .villa-location {
-  color: #a18360;
+  color: #967045; /* PERUBAHAN: Sedikit lebih gelap dari #a18360 agar kontras lebih baik */
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 1px;
+  font-weight: 600;
 }
 
 .villa-content h3 {
@@ -146,10 +168,11 @@ const props = defineProps<{
   color: #183d32;
 }
 
+/* PERUBAHAN 9: Readability & Contrast */
 .villa-description {
   min-height: 58px;
-  color: #768078;
-  font-size: 13px;
+  color: #556058; /* Diubah dari #768078 (lebih gelap = kontras lebih baik di background putih) */
+  font-size: 14px; /* Diubah dari 13px agar lebih mudah dibaca */
   line-height: 1.6;
 }
 
@@ -157,24 +180,36 @@ const props = defineProps<{
   display: flex;
   gap: 15px;
   padding: 15px 0;
-  color: #56655c;
-  font-size: 12px;
+  color: #4a5950; /* Diubah dari #56655c agar sedikit lebih tegas */
+  font-size: 13px; /* Diubah dari 12px */
+  font-weight: 500;
   border-bottom: 1px solid #edf0ec;
 }
 
 .villa-amenities {
   display: flex;
   flex-wrap: wrap;
-  gap: 7px;
+  gap: 8px;
   margin: 15px 0;
 }
 
 .amenity {
-  padding: 6px 9px;
+  padding: 6px 10px;
   background: #f1f5f1;
-  border-radius: 5px;
-  font-size: 10px;
-  color: #476253;
+  border-radius: 6px;
+  font-size: 11px; /* Diubah dari 10px (10px terlalu kecil untuk standar readability modern) */
+  color: #3a5245; /* Diubah dari #476253 agar lebih kontras */
+  font-weight: 500;
+}
+
+/* PERUBAHAN 10: Style untuk teks "+ X lainnya" */
+.amenity-more {
+  padding: 6px 10px;
+  background: #e8f0e9;
+  border-radius: 6px;
+  font-size: 11px;
+  color: #183d32;
+  font-weight: 600;
 }
 
 .villa-bottom {
@@ -188,21 +223,30 @@ const props = defineProps<{
 .villa-price strong {
   display: block;
   color: #183d32;
-  font-size: 16px;
+  font-size: 18px; /* Diubah dari 16px agar harga lebih menonjol (hierarchy) */
+  font-weight: 700;
 }
 
+/* PERUBAHAN 11: Readability & Contrast */
 .villa-price span {
-  color: #89918b;
-  font-size: 11px;
+  color: #6b7a70; /* Diubah dari #89918b (lebih gelap agar tidak terlalu pudar) */
+  font-size: 12px; /* Diubah dari 11px */
 }
 
 .villa-button {
-  padding: 11px 14px;
+  padding: 12px 16px; /* Diperbesar sedikit area kliknya */
   background: #183d32;
   color: white;
-  border-radius: 6px;
+  border-radius: 8px;
   text-decoration: none;
-  font-size: 11px;
+  font-size: 12px; /* Diubah dari 11px */
   font-weight: 600;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+/* PERUBAHAN 12: Tambahkan hover state untuk feedback visual yang baik */
+.villa-button:hover {
+  background: #0f2820;
+  transform: translateY(-1px);
 }
 </style>
