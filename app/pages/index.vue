@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { useVillas } from '~/composables/useVillas';
+// import { useVillas } from '~/composables/useVillas'
 
-const { villas: villas, pending, error } = useVillas()
+// const { villas: villas, pending, error } = useVillas()
+import { villas } from '#shared/data/villas'
 
 const facilities = [
   {
@@ -49,10 +50,7 @@ useHead({
 
 <template>
   <main>
-    <div v-if="pending" class="loading-state">Loading villas...</div>
-    <div v-else-if="error" class="error-state">Failed to load villas. Please try again later.</div>
 
-    <template v-else>
       <!-- HERO SECTION -->
       <section id="home" class="hero">
         <div class="hero-container">
@@ -168,7 +166,22 @@ useHead({
           </div>
         </div>
       </section>
-    </template>
+
+      <!-- Section Booking -->
+
+      <section id="booking" class="booking-section">
+        <div class="booking-content">
+          <span class="eyebrow" style="color: #d4e0d9;">READY TO STAY?</span>
+          <h2>Book Your Dream Villa Today.</h2>
+          <p>
+            Limited availability for the upcoming holiday season. 
+            Secure your private escape now and get the best rate guaranteed.
+          </p>
+          <NuxtLink to="#villas" class="button-light">
+            Choose Your Villa →
+          </NuxtLink>
+        </div>
+      </section>
   </main>
 </template>
 
