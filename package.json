@@ -18,6 +18,10 @@
   "devDependencies": {
     "@types/better-sqlite3": "^9.6.0",
     "typescript": "^6.0.3",
-    "vue-tsc": "^3.3.14"
+    "vue-tsc": "^3.3.14",
+    "wrangler": "^4.168.0"
+  },
+  "allowScripts": {
+    "workerd@1.20261123.1": true
   }
 }
