@@ -1,6 +1,6 @@
 <script setup lang="ts">
 
-import { villas } from '../../shared/data/villas'
+import { villas } from '~/data/villas'
 
 const facilities = [
   {
