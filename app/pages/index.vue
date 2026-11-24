@@ -1,8 +1,6 @@
 <script setup lang="ts">
-// import { useVillas } from '~/composables/useVillas'
 
-// const { villas: villas, pending, error } = useVillas()
-import { villas } from '#shared/data/villas'
+import { villas } from '../../shared/data/villas'
 
 const facilities = [
   {

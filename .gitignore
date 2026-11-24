@@ -24,7 +24,7 @@ logs
 !.env.example
 
 # Local database
-data/
+/data/
 
 # SQLite files
 *.sqlite
