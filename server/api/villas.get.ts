@@ -1,27 +1,73 @@
 
-import { getDatabase } from '../utils/database'
-
-import {
-  mapVillaRow,
-  VILLA_SELECT_COLUMNS,
-  type VillaRow
-} from '../utils/villa-mapper'
+import { getD1 } from '../utils/d1'
 
 import type { Villa } from '#shared/types/villa'
 
 
-export default defineEventHandler(() => {
+// Bentuk data dari SQLite/D1
+interface VillaRow {
 
-  // 1. Membuka database
-  const db = getDatabase()
+  id: number
+
+  slug: string
+
+  name: string
+
+  pricePerNight: number
+
+  capacity: number
+
+  bedrooms: number
+
+  bathrooms: number
+
+  location: string
+
+  description: string
+
+  imageUrl: string
+
+  galleryJson: string
+
+  amenitiesJson: string
+
+}
 
 
-  // 2. Mengambil villa yang aktif
-  const rows = db.prepare(`
+export default defineEventHandler(async (event) => {
+
+  // 1. Mengambil D1
+  const db = getD1(event)
+
+
+  // 2. Menjalankan query SELECT
+  const result = await db.prepare(`
 
     SELECT
 
-      ${VILLA_SELECT_COLUMNS}
+      id,
+
+      slug,
+
+      name,
+
+      price_per_night AS pricePerNight,
+
+      capacity,
+
+      bedrooms,
+
+      bathrooms,
+
+      location,
+
+      description,
+
+      image_url AS imageUrl,
+
+      gallery_json AS galleryJson,
+
+      amenities_json AS amenitiesJson
 
     FROM villas
 
@@ -29,27 +75,44 @@ export default defineEventHandler(() => {
 
     ORDER BY id ASC
 
-  `).all() as VillaRow[]
+  `).all<VillaRow>()
 
 
-  // 3. Mengubah SQLite row menjadi Villa
-  const data: Villa[] = rows.map((row) => {
+  // 3. Mengubah D1 result menjadi Villa
+  const data: Villa[] = result.results.map((row) => {
 
-    const villa = mapVillaRow(row)
+    return {
 
-    // Status aktif tidak perlu dikirim
-    // pada endpoint publik ini
-    const {
-      isActive,
-      ...publicVilla
-    } = villa
+      id: row.id,
 
-    return publicVilla
+      slug: row.slug,
+
+      name: row.name,
+
+      pricePerNight: row.pricePerNight,
+
+      capacity: row.capacity,
+
+      bedrooms: row.bedrooms,
+
+      bathrooms: row.bathrooms,
+
+      location: row.location,
+
+      description: row.description,
+
+      imageUrl: row.imageUrl,
+
+      gallery: JSON.parse(row.galleryJson) as string[],
+
+      amenities: JSON.parse(row.amenitiesJson) as string[]
+
+    }
 
   })
 
 
-  // 4. Mengembalikan response
+  // 4. Response JSON
   return {
 
     success: true,

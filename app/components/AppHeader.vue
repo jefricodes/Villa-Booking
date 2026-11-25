@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import Booking from '~/pages/booking.vue';
 
 const isMenuOpen = ref(false)
 
@@ -20,32 +21,51 @@ const closeMenu = () => {
       </NuxtLink>
 
       <!-- Navigation -->
+      
       <nav
         id="main-navigation"
         class="navigation"
         :class="{ 'is-open': isMenuOpen }"
       >
 
-        <NuxtLink to="/" @click="closeMenu" active-class="active-link">
+        <NuxtLink
+          :to="{ path: '/', hash: '#home' }"
+          @click="closeMenu"
+        >
           Home
         </NuxtLink>
 
-        <NuxtLink to="/#villas" @click="closeMenu" active-class="active-link">
+        <NuxtLink
+          :to="{ path: '/', hash: '#villas' }"
+          @click="closeMenu"
+        >
           Our Villas
         </NuxtLink>
 
-        <NuxtLink to="/#facilities" @click="closeMenu" active-class="active-link">
+        <NuxtLink
+          :to="{ path: '/', hash: '#facilities' }"
+          @click="closeMenu"
+        >
           Facilities
         </NuxtLink>
 
-        <NuxtLink to="booking" @click="closeMenu" active-class="active-link">
-          Book Now
+        <NuxtLink
+          :to="{ path: '/', hash:'#booking'}"
+          @click="closeMenu"
+        >
+          Contact
         </NuxtLink>
+
       </nav>
 
-      <NuxtLink to="booking" class="header-booking" @click="closeMenu">
+      <NuxtLink
+        :to="{ path: '/booking' }"
+        class="header-booking"
+        @click="closeMenu"
+      >
         Book Your Stay
       </NuxtLink>
+
 
       <!-- Mobile Menu Button -->
       <button

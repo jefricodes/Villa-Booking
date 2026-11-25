@@ -1,11 +1,21 @@
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "villa-booking",
-  "main": ".output/server/index.mjs",
-  "compatibility_date": "2026-11-24",
-  "compatibility_flags": ["nodejs_compat"],
-  "assets": {
-    "directory": ".output/public",
-    "binding": "ASSETS"
-  }
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "villa-booking",
+	"main": ".output/server/index.mjs",
+	"compatibility_date": "2026-11-24",
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	"assets": {
+		"directory": ".output/public",
+		"binding": "ASSETS"
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "villa-booking-dev",
+			"database_id": "4cceff4b-cf75-47af-ad8a-ca6a16ef814a",
+			"migrations_dir": "migrations"
+		}
+	]
 }

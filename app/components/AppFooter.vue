@@ -12,12 +12,35 @@
         </p>
       </div>
 
+
       <div class="footer-links">
-        <NuxtLink to="/">Home</NuxtLink>
-        <NuxtLink to="#villas">Our Villas</NuxtLink>
-        <NuxtLink to="#facilities">Facilities</NuxtLink>
-        <NuxtLink to="#booking">Contact</NuxtLink>
+
+        <NuxtLink
+          :to="{ path: '/', hash: '#home' }"
+        >
+          Home
+        </NuxtLink>
+
+        <NuxtLink
+          :to="{ path: '/', hash: '#villas' }"
+        >
+          Our Villas
+        </NuxtLink>
+
+        <NuxtLink
+          :to="{ path: '/', hash: '#facilities' }"
+        >
+          Facilities
+        </NuxtLink>
+
+        <NuxtLink
+          :to="{ path: '/', hash: '#booking' }"
+        >
+          Contact
+        </NuxtLink>
+
       </div>
+
 
     </div>
 

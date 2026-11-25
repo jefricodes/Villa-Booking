@@ -1,63 +1,43 @@
 
-import { getDatabase } from '../../utils/database'
+import { connect } from 'cloudflare:sockets'
+import { getD1 } from '../../utils/d1'
 
 
-export default defineEventHandler(() => {
+export default defineEventHandler(async (event) => {
 
-  // Membuka koneksi database
-  // Jika belum ada, tabel dan seed akan dibuat
-  const db = getDatabase()
+  // Mengambil D1 binding
+  const db = getD1(event)
 
+  const ping = await db.prepare('SELECT 1 AS ok').first<{ok: number}>()
 
-  // Mengambil versi SQLite
-  const version = db.prepare(`
-    SELECT sqlite_version() AS version
-  `).get() as {
-    version: string
-  }
-
-
-  // Menghitung jumlah villa
-  const villaCount = db.prepare(`
+  // Menghitung villa
+  const villaCount = await db.prepare(`
     SELECT COUNT(*) AS total
     FROM villas
-  `).get() as {
-    total: number
-  }
+  `).first<{ total: number }>()
 
 
-  // Menghitung jumlah booking
-  const bookingCount = db.prepare(`
+  // Menghitung booking
+  const bookingCount = await db.prepare(`
     SELECT COUNT(*) AS total
     FROM bookings
-  `).get() as {
-    total: number
-  }
-
-
-  // Memeriksa foreign key
-  const foreignKeysEnabled = db.pragma(
-    'foreign_keys',
-    { simple: true }
-  ) === 1
+  `).first<{ total: number }>()
 
 
   return {
 
     success: true,
 
-    message: 'Database connected successfully.',
+    message: 'Cloudflare D1 connected successfully.',
 
     database: {
-      connected: true,
-      engine: 'SQLite',
-      version: version.version,
-      foreignKeysEnabled
+      engine: 'Cloudflare D1',
+      connect: ping?.ok === 1
     },
 
     tables: {
-      villas: villaCount.total,
-      bookings: bookingCount.total
+      villas: villaCount?.total ?? 0,
+      bookings: bookingCount?.total ?? 0
     }
 
   }

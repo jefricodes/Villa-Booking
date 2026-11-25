@@ -34,3 +34,18 @@ logs
 
 # Environment variables
 .env
+
+# Local legacy SQLite database
+data/
+
+# Cloudflare local development state
+.wrangler/
+
+# Local Cloudflare variables
+.dev.vars
+.dev.vars.*
+
+# Local environment
+.env
+.env.*
+!.env.example

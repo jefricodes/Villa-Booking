@@ -9,12 +9,14 @@ import {
 } from 'vue'
 
 import { villas } from '~/data/villas'
-import { demoBookings } from '~/data/demo-bookings'
+
+import type {
+  AvailabilityCheckResponse
+} from '#shared/types/availability'
 
 import type { Villa } from '~/types/villa'
 
 import { formatRupiah } from '~/utils/formatRupiah'
-
 
 // ======================================
 // 1. MEMBACA QUERY PARAMETER
@@ -255,72 +257,39 @@ const totalPrice = computed(() => {
 // 9. MEMERIKSA BENTROK RESERVASI
 // ======================================
 
-const conflictingBooking = computed(() => {
 
-  if (
-    !selectedVilla.value ||
-    !checkIn.value ||
-    !checkOut.value ||
-    numberOfNights.value < 1
-  ) {
-    return undefined
-  }
+const availabilityStatus = ref<
+  'idle' | 'available' | 'unavailable' | 'error'
+>('idle')
 
-  return demoBookings.find((booking) => {
-
-    // Harus villa yang sama
-    const sameVilla =
-      booking.villaId === selectedVillaId.value
-
-    // Pending dan confirmed memblokir jadwal
-    const blocksSchedule =
-      booking.status === 'pending' ||
-      booking.status === 'confirmed'
-
-    // Rumus overlap tanggal
-    const dateOverlaps =
-      booking.checkIn < checkOut.value &&
-      booking.checkOut > checkIn.value
-
-    return (
-      sameVilla &&
-      blocksSchedule &&
-      dateOverlaps
-    )
-
-  })
-
-})
-
+const availabilityMessage = ref('')
 
 const hasDateConflict = computed(() => {
-  return Boolean(conflictingBooking.value)
+  return availabilityStatus.value === 'unavailable'
 })
-
-
-// Pesan informasi ketersediaan
-const availabilityMessage = computed(() => {
-
-  if (!checkIn.value || !checkOut.value) {
-    return ''
-  }
-
-  if (numberOfNights.value < 1) {
-    return ''
-  }
-
-  if (hasDateConflict.value) {
-    return 'Tanggal tersebut bertabrakan dengan reservasi yang sudah tercatat.'
-  }
-
-  return 'Tidak ditemukan bentrok pada data simulasi. Ketersediaan sebenarnya belum diverifikasi server.'
-
-})
-
 
 // ======================================
 // 10. WATCH PERUBAHAN CHECK-IN
 // ======================================
+
+
+watch(
+  [selectedVillaId, checkIn, checkOut],
+  () => {
+
+    isPreviewVisible.value = false
+
+    availabilityStatus.value = 'idle'
+
+    availabilityMessage.value = ''
+
+    clearFieldError('villa')
+    clearFieldError('checkIn')
+    clearFieldError('checkOut')
+
+  }
+)
+
 
 watch(checkIn, (newValue) => {
 
@@ -548,33 +517,94 @@ function clearFieldError(field: string): void {
 // 15. PROSES FORM
 // ======================================
 
-async function handleSubmit() {
 
+async function handleSubmit(): Promise<void> {
+
+  // Tutup ringkasan sebelumnya
   isPreviewVisible.value = false
 
-  // Jalankan validasi
-  const isValid = validateForm()
-
-  if (!isValid) {
+  // Jalankan validasi form lokal
+  if (!validateForm()) {
     return
   }
 
-  // Aktifkan loading
+  // Tampilkan loading
   isSubmitting.value = true
+
+  availabilityStatus.value = 'idle'
+
+  availabilityMessage.value = ''
 
   try {
 
-    // Simulasi proses pemeriksaan
-    await new Promise<void>((resolve) => {
-      setTimeout(resolve, 500)
-    })
+    // ==================================
+    // REQUEST KE BACKEND D1
+    // ==================================
 
-    // Tampilkan preview
+    const response =
+      await $fetch<AvailabilityCheckResponse>(
+        '/api/availability/check',
+        {
+          method: 'POST',
+
+          body: {
+
+            villaId: selectedVillaId.value,
+
+            checkIn: checkIn.value,
+
+            checkOut: checkOut.value
+
+          }
+        }
+      )
+
+
+    // ==================================
+    // MEMBACA HASIL BACKEND
+    // ==================================
+
+    availabilityStatus.value =
+      response.available
+        ? 'available'
+        : 'unavailable'
+
+    availabilityMessage.value =
+      response.message
+
+
+    // Jika tanggal bertabrakan
+    if (!response.available) {
+
+      fieldErrors.value = {
+        ...fieldErrors.value,
+
+        checkOut: response.message
+      }
+
+      return
+
+    }
+
+
+    // Jika tersedia, tampilkan preview
     isPreviewVisible.value = true
+
+  } catch (error) {
+
+    console.error(
+      'Availability API error:',
+      error
+    )
+
+    availabilityStatus.value = 'error'
+
+    availabilityMessage.value =
+      'Tidak dapat memeriksa ketersediaan. Silakan coba lagi.'
 
   } finally {
 
-    // Matikan loading
+    // Selalu matikan loading
     isSubmitting.value = false
 
   }
@@ -735,19 +765,24 @@ async function handleSubmit() {
                 </small>
         </div>
 
-        <div
-        v-if="availabilityMessage"
-        class="availability-message full-width"
-        :class="{
-            'is-unavailable': hasDateConflict
-        }"
-        role="status"
-        >
-        <span v-if="hasDateConflict">✕</span>
-        <span v-else>✓</span>
 
-        {{ availabilityMessage }}
+        <div
+          v-if="availabilityMessage"
+          class="availability-message"
+          :class="{
+            'is-unavailable':
+              availabilityStatus === 'unavailable' ||
+              availabilityStatus === 'error'
+          }"
+          role="status"
+        >
+          <span>
+            {{ availabilityStatus === 'available' ? '✓' : '!' }}
+          </span>
+
+          {{ availabilityMessage }}
         </div>
+
 
 
 
@@ -1074,7 +1109,7 @@ async function handleSubmit() {
           <strong>Catatan:</strong>
           Data ini baru ditampilkan di browser.
           Belum tersimpan dan belum mengunci tanggal villa.
-          Tahap penyimpanan akan kita buat pada Backend Development.
+          Masih dalam tahap development.
         </div>
 
       </div>

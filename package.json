@@ -6,8 +6,10 @@
     "build": "nuxt build",
     "dev": "nuxt dev",
     "generate": "nuxt generate",
-    "preview": "nuxt preview",
-    "postinstall": "nuxt prepare"
+    "postinstall": "nuxt prepare",
+    "cf-typegen": "wrangler types",
+    "preview": "npm run build && wrangler dev",
+    "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {
     "better-sqlite3": "^13.2.0",
@@ -25,4 +27,8 @@
   "allowScripts": {
     "workerd@1.20261123.1": true
   }
+
+
+
 }
+

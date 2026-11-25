@@ -1,38 +1,27 @@
 
-import { villas } from '#shared/data/villas'
+import { z } from 'zod'
 
-import { demoBookings } from '#shared/data/demo-bookings'
+import { getD1 } from '../../utils/d1'
 
 
 // ======================================
-// 1. MEMVALIDASI FORMAT TANGGAL
+// 1. VALIDASI TANGGAL
 // ======================================
 
-function isValidDateOnly(
-  value: unknown
-): value is string {
+function isValidDateOnly(value: string): boolean {
 
-  // Harus berupa teks
-  if (typeof value !== 'string') {
-    return false
-  }
-
-  // Format harus YYYY-MM-DD
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     return false
   }
 
-  // Pecah tanggal menjadi angka
   const [year=0, month=1, day=1] = value
     .split('-')
     .map(Number)
 
-  // Buat tanggal UTC
   const date = new Date(
     Date.UTC(year, month - 1, day)
   )
 
-  // Pastikan tanggal benar-benar valid
   return (
     date.getUTCFullYear() === year &&
     date.getUTCMonth() === month - 1 &&
@@ -43,13 +32,179 @@ function isValidDateOnly(
 
 
 // ======================================
-// 2. MENGHITUNG JUMLAH MALAM
+// 2. VALIDASI REQUEST BODY
 // ======================================
 
-function calculateNights(
-  checkIn: string,
-  checkOut: string
-): number {
+const availabilitySchema = z.strictObject({
+
+  villaId: z
+    .number()
+    .int()
+    .positive(),
+
+  checkIn: z
+    .string()
+    .refine(
+      isValidDateOnly,
+      'Tanggal check-in tidak valid.'
+    ),
+
+  checkOut: z
+    .string()
+    .refine(
+      isValidDateOnly,
+      'Tanggal check-out tidak valid.'
+    )
+
+})
+
+
+// ======================================
+// 3. TIPE DATA DATABASE
+// ======================================
+
+interface VillaPriceRow {
+
+  id: number
+
+  name: string
+
+  capacity: number
+
+  pricePerNight: number
+
+}
+
+
+// ======================================
+// 4. API HANDLER
+// ======================================
+
+export default defineEventHandler(async (event) => {
+
+  // Membaca request
+  const body = await readBody<unknown>(event)
+
+
+  // Menjalankan validasi
+  const parsed = availabilitySchema.safeParse(body)
+
+
+  if (!parsed.success) {
+
+    throw createError({
+
+      statusCode: 400,
+
+      statusMessage: 'Data reservasi tidak valid.',
+
+      data: {
+        issues: parsed.error.issues
+      }
+
+    })
+
+  }
+
+
+  const {
+    villaId,
+    checkIn,
+    checkOut
+  } = parsed.data
+
+
+  // Memastikan checkout setelah checkin
+  if (checkOut <= checkIn) {
+
+    throw createError({
+
+      statusCode: 400,
+
+      statusMessage:
+        'Check-out harus setelah check-in.'
+
+    })
+
+  }
+
+
+  // Mengambil database D1
+  const db = getD1(event)
+
+
+  // ==================================
+  // 5. MENCARI VILLA
+  // ==================================
+
+  const villa = await db.prepare(`
+
+    SELECT
+
+      id,
+
+      name,
+
+      capacity,
+
+      price_per_night AS pricePerNight
+
+    FROM villas
+
+    WHERE id = ?
+
+      AND is_active = 1
+
+  `)
+    .bind(villaId)
+    .first<VillaPriceRow>()
+
+
+  if (!villa) {
+
+    throw createError({
+
+      statusCode: 404,
+
+      statusMessage: 'Villa tidak ditemukan atau tidak aktif.'
+
+    })
+
+  }
+
+
+  // ==================================
+  // 6. MEMERIKSA BENTROK D1
+  // ==================================
+
+  const conflict = await db.prepare(`
+
+    SELECT id
+
+    FROM bookings
+
+    WHERE villa_id = ?
+
+      AND status IN ('pending', 'confirmed')
+
+      AND check_in < ?
+
+      AND check_out > ?
+
+    LIMIT 1
+
+  `)
+    .bind(
+      villaId,
+      checkOut,
+      checkIn
+    )
+    .first<{ id: number }>()
+
+
+  // ==================================
+  // 7. MENGHITUNG JUMLAH MALAM
+  // ==================================
 
   const start = Date.parse(
     `${checkIn}T00:00:00.000Z`
@@ -59,188 +214,38 @@ function calculateNights(
     `${checkOut}T00:00:00.000Z`
   )
 
-  return (end - start) / 86400000
-
-}
+  const nights = (end - start) / 86400000
 
 
-// ======================================
-// 3. MEMBUAT API HANDLER
-// ======================================
-
-export default defineEventHandler(async (event) => {
-
-
-  // ----------------------------------
-  // A. MEMBACA REQUEST BODY
-  // ----------------------------------
-
-  const body = await readBody<unknown>(event)
-
-
-  // Pastikan body berbentuk object
-  if (
-    body === null ||
-    typeof body !== 'object' ||
-    Array.isArray(body)
-  ) {
-
-    throw createError({
-      status: 400,
-      statusText: 'Request body harus berupa JSON object.'
-    })
-
-  }
-
-
-  // Mengubah body menjadi object
-  const payload = body as Record<string, unknown>
-
-
-  // Mengambil data dari request
-  const villaId = payload.villaId
-
-  const checkIn = payload.checkIn
-
-  const checkOut = payload.checkOut
-
-
-  // ----------------------------------
-  // B. VALIDASI VILLA ID
-  // ----------------------------------
-
-  if (
-    typeof villaId !== 'number' ||
-    !Number.isSafeInteger(villaId)
-  ) {
-
-    throw createError({
-      status: 400,
-      statusMessage: 'Villa ID tidak valid.'
-    })
-
-  }
-
-
-  // ----------------------------------
-  // C. VALIDASI TANGGAL
-  // ----------------------------------
-
-  if (!isValidDateOnly(checkIn)) {
-
-    throw createError({
-      status: 400,
-      statusMessage: 'Format check-in tidak valid.'
-    })
-
-  }
-
-
-  if (!isValidDateOnly(checkOut)) {
-
-    throw createError({
-      status: 400,
-      statusMessage: 'Format check-out tidak valid.'
-    })
-
-  }
-
-
-  // Check-out harus setelah check-in
-  if (checkOut <= checkIn) {
-
-    throw createError({
-      status: 400,
-      statusMessage: 'Check-out harus setelah check-in.'
-    })
-
-  }
-
-
-  // ----------------------------------
-  // D. MENCARI DATA VILLA
-  // ----------------------------------
-
-  const villa = villas.find((item) => {
-
-    return item.id === villaId
-
-  })
-
-
-  if (!villa) {
-
-    throw createError({
-      status: 404,
-      statusMessage: 'Villa tidak ditemukan.'
-    })
-
-  }
-
-
-  // ----------------------------------
-  // E. MEMERIKSA BENTROK RESERVASI
-  // ----------------------------------
-
-  const conflict = demoBookings.find((booking) => {
-
-    // Villa harus sama
-    const sameVilla =
-      booking.villaId === villaId
-
-
-    // Hanya pending dan confirmed yang memblokir
-    const activeBooking =
-      booking.status === 'pending' ||
-      booking.status === 'confirmed'
-
-
-    // Pemeriksaan overlap
-    const overlapping =
-
-      booking.checkIn < checkOut &&
-      booking.checkOut > checkIn
-
-
-    return (
-      sameVilla &&
-      activeBooking &&
-      overlapping
-    )
-
-  })
-
-
-  // ----------------------------------
-  // F. MENGHITUNG ESTIMASI HARGA
-  // ----------------------------------
-
-  const nights = calculateNights(
-    checkIn,
-    checkOut
-  )
+  // ==================================
+  // 8. MENGHITUNG HARGA
+  // ==================================
 
   const totalPrice =
     nights * villa.pricePerNight
 
 
-  // ----------------------------------
-  // G. MENGIRIM RESPONSE JSON
-  // ----------------------------------
+  // ==================================
+  // 9. RESPONSE
+  // ==================================
+
+  const available = !conflict
 
   return {
 
     success: true,
 
-    available: !conflict,
+    available,
 
-    message: conflict
-      ? 'Tanggal bertabrakan dengan reservasi lainnya.'
-      : 'Tidak ditemukan bentrok pada data simulasi.',
+    message: available
+
+      ? 'Tanggal tersedia berdasarkan data database.'
+      : 'Tanggal bertabrakan dengan reservasi lain.',
 
     villa: {
       id: villa.id,
-      name: villa.name
+      name: villa.name,
+      capacity: villa.capacity
     },
 
     stay: {
@@ -252,9 +257,7 @@ export default defineEventHandler(async (event) => {
     price: {
       perNight: villa.pricePerNight,
       totalPrice
-    },
-
-    demoOnly: true
+    }
 
   }
 
