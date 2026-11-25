@@ -13,10 +13,10 @@
       </div>
 
       <div class="footer-links">
-        <a href="#home">Home</a>
-        <a href="#villas">Our Villas</a>
-        <a href="#facilities">Facilities</a>
-        <a href="#booking">Contact</a>
+        <NuxtLink to="/">Home</NuxtLink>
+        <NuxtLink to="#villas">Our Villas</NuxtLink>
+        <NuxtLink to="#facilities">Facilities</NuxtLink>
+        <NuxtLink to="#booking">Contact</NuxtLink>
       </div>
 
     </div>

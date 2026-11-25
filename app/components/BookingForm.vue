@@ -832,14 +832,14 @@ async function handleSubmit() {
             type="tel"
             inputmode="tel"
             maxlength="20"
-            placeholder="081234567890"
+            placeholder="0812xxx"
             autocomplete="tel"
             :aria-invalid="Boolean(fieldErrors.guestPhone)"
             required
             />
 
             <small>
-            Contoh: 081234567890 atau +6281234567890
+            Contoh: 0812xxx atau +6281xxx
             </small>
 
             <small

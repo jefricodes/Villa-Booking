@@ -1,40 +1,10 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useRoute, navigateTo } from '#app'
 
 const isMenuOpen = ref(false)
-const route = useRoute()
 
-function closeMenu() {
+const closeMenu = () => {
   isMenuOpen.value = false
-}
-
-// PERUBAHAN: Logika navigasi cerdas yang diperbarui
-function handleNavigation(targetId: string) {
-  closeMenu()
-
-  if (route.path === '/') {
-    // --- JIKA SEDANG DI HOMEPAGE ---
-    if (targetId === 'home') {
-      // Scroll ke paling atas halaman dengan mulus
-      window.scrollTo({ top: 0, behavior: 'smooth' })
-    } else {
-      // Scroll ke section tertentu
-      const targetElement = document.getElementById(targetId)
-      if (targetElement) {
-        targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      }
-    }
-  } else {
-    // --- JIKA SEDANG DI HALAMAN LAIN (MISAL: /booking) ---
-    if (targetId === 'home') {
-      // PERUBAHAN UTAMA: Jika tujuannya 'home', cukup arahkan ke '/' tanpa hash (#)
-      navigateTo('/') 
-    } else {
-      // Jika tujuannya section lain (villas, facilities, booking), tambahkan hash
-      navigateTo(`/#${targetId}`)
-    }
-  }
 }
 </script>
 
@@ -42,13 +12,12 @@ function handleNavigation(targetId: string) {
   <header class="header">
     <div class="header-container">
 
-      <!-- Logo: Klik logo akan selalu kembali ke Home (atas) -->
-      <a href="#home" class="brand" @click.prevent="handleNavigation('home')">
+      <NuxtLink to="/" class="brand" @click="closeMenu">
         <span class="brand-icon">V</span>
         <span class="brand-name">
           VILLA<span>STAY</span>
         </span>
-      </a>
+      </NuxtLink>
 
       <!-- Navigation -->
       <nav
@@ -56,35 +25,33 @@ function handleNavigation(targetId: string) {
         class="navigation"
         :class="{ 'is-open': isMenuOpen }"
       >
-        <!-- PERUBAHAN: Semua link menggunakan fungsi handleNavigation yang sama -->
-        <a href="#home" @click.prevent="handleNavigation('home')">
+
+        <NuxtLink to="/" @click="closeMenu" active-class="active-link">
           Home
-        </a>
+        </NuxtLink>
 
-        <a href="#villas" @click.prevent="handleNavigation('villas')">
+        <NuxtLink to="/#villas" @click="closeMenu" active-class="active-link">
           Our Villas
-        </a>
+        </NuxtLink>
 
-        <a href="#facilities" @click.prevent="handleNavigation('facilities')">
+        <NuxtLink to="/#facilities" @click="closeMenu" active-class="active-link">
           Facilities
-        </a>
+        </NuxtLink>
 
-        <NuxtLink to="booking" @click.prevent="handleNavigation('booking')">
+        <NuxtLink to="booking" @click="closeMenu" active-class="active-link">
           Book Now
         </NuxtLink>
       </nav>
 
-      <!-- Tombol CTA di Header -->
-      <a href="#booking" class="header-booking" @click.prevent="handleNavigation('booking')">
+      <NuxtLink to="booking" class="header-booking" @click="closeMenu">
         Book Your Stay
-      </a>
+      </NuxtLink>
 
       <!-- Mobile Menu Button -->
       <button
         class="menu-toggle"
         type="button"
         aria-label="Toggle navigation"
-        aria-controls="main-navigation"
         :aria-expanded="isMenuOpen"
         @click="isMenuOpen = !isMenuOpen"
       >
@@ -96,7 +63,6 @@ function handleNavigation(targetId: string) {
 </template>
 
 <style scoped>
-/* Style tetap sama seperti sebelumnya, tidak ada perubahan di sini */
 .header {
   position: sticky;
   top: 0;

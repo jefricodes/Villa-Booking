@@ -1,73 +1,27 @@
 
 import { getDatabase } from '../utils/database'
 
+import {
+  mapVillaRow,
+  VILLA_SELECT_COLUMNS,
+  type VillaRow
+} from '../utils/villa-mapper'
+
 import type { Villa } from '#shared/types/villa'
-
-
-// Bentuk data hasil query SQLite
-interface VillaRow {
-
-  id: number
-
-  slug: string
-
-  name: string
-
-  pricePerNight: number
-
-  capacity: number
-
-  bedrooms: number
-
-  bathrooms: number
-
-  location: string
-
-  description: string
-
-  imageUrl: string
-
-  galleryJson: string
-
-  amenitiesJson: string
-
-}
 
 
 export default defineEventHandler(() => {
 
-  // Membuka koneksi database
+  // 1. Membuka database
   const db = getDatabase()
 
 
-  // Membuat SQL query
+  // 2. Mengambil villa yang aktif
   const rows = db.prepare(`
 
     SELECT
 
-      id,
-
-      slug,
-
-      name,
-
-      price_per_night AS pricePerNight,
-
-      capacity,
-
-      bedrooms,
-
-      bathrooms,
-
-      location,
-
-      description,
-
-      image_url AS imageUrl,
-
-      gallery_json AS galleryJson,
-
-      amenities_json AS amenitiesJson
+      ${VILLA_SELECT_COLUMNS}
 
     FROM villas
 
@@ -78,40 +32,24 @@ export default defineEventHandler(() => {
   `).all() as VillaRow[]
 
 
-  // Mengubah row database menjadi object Villa
+  // 3. Mengubah SQLite row menjadi Villa
   const data: Villa[] = rows.map((row) => {
 
-    return {
+    const villa = mapVillaRow(row)
 
-      id: row.id,
+    // Status aktif tidak perlu dikirim
+    // pada endpoint publik ini
+    const {
+      isActive,
+      ...publicVilla
+    } = villa
 
-      slug: row.slug,
-
-      name: row.name,
-
-      pricePerNight: row.pricePerNight,
-
-      capacity: row.capacity,
-
-      bedrooms: row.bedrooms,
-
-      bathrooms: row.bathrooms,
-
-      location: row.location,
-
-      description: row.description,
-
-      imageUrl: row.imageUrl,
-
-      gallery: JSON.parse(row.galleryJson) as string[],
-
-      amenities: JSON.parse(row.amenitiesJson) as string[]
-
-    }
+    return publicVilla
 
   })
 
 
+  // 4. Mengembalikan response
   return {
 
     success: true,

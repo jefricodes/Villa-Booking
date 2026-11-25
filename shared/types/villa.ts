@@ -1,3 +1,7 @@
+export interface VillaRecord extends Villa {
+  isActive : boolean
+}
+
 export interface Villa {
   id: number
   slug: string
