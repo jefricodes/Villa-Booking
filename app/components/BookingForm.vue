@@ -1,262 +1,55 @@
 
-
 <script setup lang="ts">
-import {
-  ref,
-  computed,
-  watch,
-  onMounted
-} from 'vue'
-
-import { villas } from '~/data/villas'
-
-import type {
-  AvailabilityCheckResponse
-} from '#shared/types/availability'
+import { ref, computed, watch, onMounted } from 'vue'
+import { useRoute } from '#app'
 
 import type { Villa } from '~/types/villa'
+import type { AvailabilityCheckResponse } from '#shared/types/availability'
+import type {
+  BookingCreateRequest,
+  BookingCreateResponse
+} from '#shared/types/booking'
 
 import { formatRupiah } from '~/utils/formatRupiah'
 
-// ======================================
-// 1. MEMBACA QUERY PARAMETER
-// ======================================
+const props = defineProps<{
+  villas: Villa[]
+}>()
 
 const route = useRoute()
 
-function getVillaIdFromQuery(
-  queryValue: unknown
-): number | undefined {
+// ======================================
+// 1. STATE & INITIALIZATION
+// ======================================
 
-  const value = Array.isArray(queryValue)
-    ? queryValue[0]
-    : queryValue
-
-  if (typeof value !== 'string' || value.trim() === '') {
-    return undefined
-  }
-
-  const villaId = Number(value)
-
-  if (!Number.isSafeInteger(villaId)) {
-    return undefined
-  }
-
-  const exists = villas.some(
-    (villa) => villa.id === villaId
+const getTodayString = () => {
+  const now = new Date()
+  const localDate = new Date(
+    now.getTime() - now.getTimezoneOffset() * 60_000
   )
 
-  return exists ? villaId : undefined
+  return localDate.toISOString().split('T')[0]!
 }
 
+const today = ref(getTodayString())
 
-// ======================================
-// 2. DATA FORM
-// ======================================
+const form = ref({
+  villaId: Number(route.query.villa) || props.villas[0]?.id || 0,
+  checkIn: '',
+  checkOut: '',
+  guestCount: 1,
+  guestName: '',
+  guestPhone: '',
+  guestEmail: '',
+  specialRequest: ''
+})
 
-const today = ref('')
+const errors = ref<Record<string, string>>({})
 
-const selectedVillaId = ref<number>(
-  getVillaIdFromQuery(route.query.villa)
-  ?? villas[0]?.id
-  ?? 0
-)
-
-const checkIn = ref('')
-const checkOut = ref('')
-
-const guestCount = ref(1)
-
-const guestName = ref('')
-const guestPhone = ref('')
-const guestEmail = ref('')
-
-const specialRequest = ref('')
-
-// Status tampilan
 const isSubmitting = ref(false)
+const isCreatingBooking = ref(false)
+
 const isPreviewVisible = ref(false)
-
-// Menyimpan pesan error setiap input
-const fieldErrors = ref<Record<string, string>>({})
-
-
-// ======================================
-// 3. MENGIKUTI PILIHAN VILLA DARI URL
-// ======================================
-
-watch(
-  () => route.query.villa,
-  (newValue) => {
-
-    const villaId = getVillaIdFromQuery(newValue)
-
-    if (villaId !== undefined) {
-      selectedVillaId.value = villaId
-    }
-
-  }
-)
-
-
-// ======================================
-// 4. MENGAMBIL DATA VILLA
-// ======================================
-
-const selectedVilla = computed((): Villa | undefined => {
-
-  return villas.find(
-    (villa) => villa.id === selectedVillaId.value
-  )
-
-})
-
-
-const maxGuests = computed(() => {
-  return selectedVilla.value?.capacity ?? 1
-})
-
-
-// ======================================
-// 5. FUNGSI PENGOLAHAN TANGGAL
-// ======================================
-
-function getLocalDateValue(date: Date): string {
-
-  const year = date.getFullYear()
-
-  const month = String(
-    date.getMonth() + 1
-  ).padStart(2, '0')
-
-  const day = String(
-    date.getDate()
-  ).padStart(2, '0')
-
-  return `${year}-${month}-${day}`
-
-}
-
-
-function addOneDay(dateValue: string): string {
-
-  const [year=0, month=1, day=1] = dateValue
-    .split('-')
-    .map(Number)
-
-  const date = new Date(
-    Date.UTC(year, month - 1, day)
-  )
-
-  date.setUTCDate(date.getUTCDate() + 1)
-
-  const newYear = date.getUTCFullYear()
-
-  const newMonth = String(
-    date.getUTCMonth() + 1
-  ).padStart(2, '0')
-
-  const newDay = String(
-    date.getUTCDate()
-  ).padStart(2, '0')
-
-  return `${newYear}-${newMonth}-${newDay}`
-
-}
-
-
-function getDateTimestamp(dateValue: string): number {
-
-  const [year=0, month=1, day=1] = dateValue
-    .split('-')
-    .map(Number)
-
-  return Date.UTC(year, month - 1, day)
-
-}
-
-
-function formatBookingDate(dateValue: string): string {
-
-  if (!dateValue) {
-    return '-'
-  }
-
-  const [year=0, month=1, day=1] = dateValue
-    .split('-')
-    .map(Number)
-
-  const date = new Date(
-    Date.UTC(year, month - 1, day)
-  )
-
-  return new Intl.DateTimeFormat('id-ID', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-    timeZone: 'UTC'
-  }).format(date)
-
-}
-
-
-// ======================================
-// 6. MENGHITUNG JUMLAH MALAM
-// ======================================
-
-const numberOfNights = computed(() => {
-
-  if (!checkIn.value || !checkOut.value) {
-    return 0
-  }
-
-  const start = getDateTimestamp(checkIn.value)
-
-  const end = getDateTimestamp(checkOut.value)
-
-  const difference = end - start
-
-  if (difference <= 0) {
-    return 0
-  }
-
-  return difference / 86400000
-
-})
-
-
-// ======================================
-// 7. MENGATUR MINIMUM CHECK-OUT
-// ======================================
-
-const minCheckOut = computed(() => {
-
-  if (!checkIn.value) {
-    return today.value
-  }
-
-  return addOneDay(checkIn.value)
-
-})
-
-
-// ======================================
-// 8. MENGHITUNG ESTIMASI HARGA
-// ======================================
-
-const totalPrice = computed(() => {
-
-  const price = selectedVilla.value?.pricePerNight ?? 0
-
-  return price * numberOfNights.value
-
-})
-
-
-// ======================================
-// 9. MEMERIKSA BENTROK RESERVASI
-// ======================================
-
 
 const availabilityStatus = ref<
   'idle' | 'available' | 'unavailable' | 'error'
@@ -264,867 +57,967 @@ const availabilityStatus = ref<
 
 const availabilityMessage = ref('')
 
-const hasDateConflict = computed(() => {
-  return availabilityStatus.value === 'unavailable'
-})
+const serverQuote = ref<AvailabilityCheckResponse | null>(null)
+
+const bookingResult = ref<BookingCreateResponse['data'] | null>(null)
+const bookingError = ref('')
 
 // ======================================
-// 10. WATCH PERUBAHAN CHECK-IN
+// 2. API COMPOSABLE
 // ======================================
 
+const { createBooking } = useBookingApi()
 
-watch(
-  [selectedVillaId, checkIn, checkOut],
-  () => {
+// ======================================
+// 3. COMPUTED PROPERTIES
+// ======================================
 
-    isPreviewVisible.value = false
-
-    availabilityStatus.value = 'idle'
-
-    availabilityMessage.value = ''
-
-    clearFieldError('villa')
-    clearFieldError('checkIn')
-    clearFieldError('checkOut')
-
-  }
+const selectedVilla = computed(() =>
+  props.villas.find(v => v.id === form.value.villaId)
 )
 
+const maxGuests = computed(() => selectedVilla.value?.capacity ?? 1)
 
-watch(checkIn, (newValue) => {
+const numberOfNights = computed(() => {
+  if (!form.value.checkIn || !form.value.checkOut) return 0
 
-  if (
-    newValue &&
-    checkOut.value &&
-    checkOut.value <= newValue
-  ) {
-    checkOut.value = ''
-  }
+  const start = Date.parse(`${form.value.checkIn}T00:00:00Z`)
+  const end = Date.parse(`${form.value.checkOut}T00:00:00Z`)
 
+  const diff = end - start
+
+  return diff > 0 ? diff / (1000 * 60 * 60 * 24) : 0
 })
 
+const minCheckOut = computed(() => {
+  if (!form.value.checkIn) return today.value
 
-// ======================================
-// 11. WATCH PERUBAHAN VILLA
-// ======================================
+  const nextDay = new Date(`${form.value.checkIn}T00:00:00`)
+  nextDay.setDate(nextDay.getDate() + 1)
 
-watch(selectedVillaId, () => {
+  const year = nextDay.getFullYear()
+  const month = String(nextDay.getMonth() + 1).padStart(2, '0')
+  const day = String(nextDay.getDate()).padStart(2, '0')
 
-  if (guestCount.value > maxGuests.value) {
-    guestCount.value = maxGuests.value
-  }
-
+  return `${year}-${month}-${day}`
 })
 
+const displayedPricePerNight = computed(() =>
+  serverQuote.value?.price.perNight ??
+  selectedVilla.value?.pricePerNight ??
+  0
+)
+
+const displayedNights = computed(() =>
+  serverQuote.value?.stay.nights ?? numberOfNights.value
+)
+
+const displayedTotalPrice = computed(() =>
+  serverQuote.value?.price.totalPrice ??
+  displayedPricePerNight.value * displayedNights.value
+)
 
 // ======================================
-// 12. RESET PREVIEW DAN ERROR
+// 4. WATCHERS
 // ======================================
 
-// Tutup preview jika ada perubahan form
+// Reset hasil pemeriksaan dan preview jika pilihan utama berubah.
 watch(
-  [
-    selectedVillaId,
-    checkIn,
-    checkOut,
-    guestCount,
-    guestName,
-    guestPhone,
-    guestEmail,
-    specialRequest
+  () => [
+    form.value.villaId,
+    form.value.checkIn,
+    form.value.checkOut,
+    form.value.guestCount
   ],
   () => {
     isPreviewVisible.value = false
+    serverQuote.value = null
+    availabilityStatus.value = 'idle'
+    availabilityMessage.value = ''
+
+    // Hapus pesan error booking lama ketika data berubah.
+    bookingError.value = ''
+    bookingResult.value = null
   }
 )
 
+// Sesuaikan jumlah tamu dengan kapasitas villa.
+watch(
+  () => form.value.villaId,
+  () => {
+    if (form.value.guestCount > maxGuests.value) {
+      form.value.guestCount = maxGuests.value
+    }
 
-// Hapus error sesuai input yang diperbaiki
-watch(guestName, () => {
-  clearFieldError('guestName')
-})
+    clearError('villaId')
+    clearError('guestCount')
+  }
+)
 
-watch(guestPhone, () => {
-  clearFieldError('guestPhone')
-})
+// Reset check-out jika check-in baru membuatnya tidak valid.
+watch(
+  () => form.value.checkIn,
+  (newCheckIn) => {
+    if (form.value.checkOut && form.value.checkOut <= newCheckIn) {
+      form.value.checkOut = ''
+    }
 
-watch(guestEmail, () => {
-  clearFieldError('guestEmail')
-})
-
-watch(guestCount, () => {
-  clearFieldError('guestCount')
-})
-
-watch(specialRequest, () => {
-  clearFieldError('specialRequest')
-})
-
-watch (checkIn, () => {
-    clearFieldError('checkIn')
-    clearFieldError('checkOut')
-})
-
-watch (selectedVillaId, () => {
-    clearFieldError('villa')
-    clearFieldError('guestCount')
-})
-
+    clearError('checkIn')
+    clearError('checkOut')
+  }
+)
 
 // ======================================
-// 13. SET TANGGAL HARI INI
+// 5. METHODS & VALIDATION
 // ======================================
 
-onMounted(() => {
+const clearError = (field: string) => {
+  delete errors.value[field]
+}
 
-  today.value = getLocalDateValue(new Date())
+const formatBookingDate = (dateStr: string) => {
+  if (!dateStr) return '-'
 
-})
+  return new Date(`${dateStr}T00:00:00Z`).toLocaleDateString('id-ID', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC'
+  })
+}
 
+const validateForm = (): boolean => {
+  const newErrors: Record<string, string> = {}
 
-// ======================================
-// 14. VALIDASI FORM
-// ======================================
-
-function validateForm(): boolean {
-
-  const errors: Record<string, string> = {}
-
-  // Periksa villa
-  if (!selectedVilla.value) {
-    errors.villa = 'Silakan pilih villa.'
+  if (!form.value.villaId || !selectedVilla.value) {
+    newErrors.villaId = 'Silakan pilih villa.'
   }
 
-
-  // Periksa check-in
-  if (!checkIn.value) {
-
-    errors.checkIn = 'Tanggal check-in wajib dipilih.'
-
-  } else if (
-    today.value &&
-    checkIn.value < today.value
-  ) {
-
-    errors.checkIn = 'Tanggal check-in tidak boleh di masa lalu.'
-
+  if (!form.value.checkIn) {
+    newErrors.checkIn = 'Tanggal check-in wajib dipilih.'
+  } else if (form.value.checkIn < today.value) {
+    newErrors.checkIn = 'Tanggal check-in tidak boleh di masa lalu.'
   }
 
-
-  // Periksa check-out
-  if (!checkOut.value) {
-
-    errors.checkOut = 'Tanggal check-out wajib dipilih.'
-
-  } else if (!checkIn.value) {
-
-    errors.checkOut = 'Pilih check-in terlebih dahulu.'
-
+  if (!form.value.checkOut) {
+    newErrors.checkOut = 'Tanggal check-out wajib dipilih.'
   } else if (numberOfNights.value < 1) {
-
-    errors.checkOut =
-      'Check-out harus minimal satu hari setelah check-in.'
-
-  } else if (hasDateConflict.value) {
-
-    errors.checkOut =
-      'Tanggal menginap bertabrakan dengan reservasi lain.'
-
+    newErrors.checkOut = 'Check-out harus minimal satu hari setelah check-in.'
   }
-
-
-  // Periksa jumlah tamu
-  if (!Number.isInteger(guestCount.value)) {
-
-    errors.guestCount = 'Jumlah tamu harus berupa angka bulat.'
-
-  } else if (
-    guestCount.value < 1 ||
-    guestCount.value > maxGuests.value
-  ) {
-
-    errors.guestCount =
-      `Jumlah tamu harus antara 1 sampai ${maxGuests.value} orang.`
-
-  }
-
-
-  // Periksa nama pelanggan
-  const name = guestName.value.trim()
-
-  if (name.length < 3) {
-
-    errors.guestName =
-      'Nama harus memiliki minimal 3 karakter.'
-
-  }
-
-
-  // Periksa nomor telepon
-  const phone = guestPhone.value.replace(
-    /[\s()-]/g,
-    ''
-  )
-
-  if (!phone) {
-
-    errors.guestPhone =
-      'Nomor telepon wajib diisi.'
-
-  } else if (!/^\+?[0-9]{10,15}$/.test(phone)) {
-
-    errors.guestPhone =
-      'Masukkan nomor telepon dengan 10–15 digit.'
-
-  }
-
-
-  // Periksa email jika diisi
-  const email = guestEmail.value.trim()
 
   if (
-    email &&
-    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+    form.value.guestCount < 1 ||
+    form.value.guestCount > maxGuests.value
   ) {
-
-    errors.guestEmail =
-      'Format alamat email tidak valid.'
-
+    newErrors.guestCount =
+      `Jumlah tamu harus antara 1 sampai ${maxGuests.value} orang.`
   }
 
-
-  // Simpan semua error
-  fieldErrors.value = errors
-
-  // Jika tidak ada error, hasilnya true
-  return Object.keys(errors).length === 0
-
-}
-function clearFieldError(field: string): void {
-
-  const updatedErrors = {
-    ...fieldErrors.value
+  if (form.value.guestName.trim().length < 3) {
+    newErrors.guestName = 'Nama harus memiliki minimal 3 karakter.'
   }
 
-  delete updatedErrors[field]
+  const phone = form.value.guestPhone.replace(/[\s()-]/g, '')
 
-  fieldErrors.value = updatedErrors
+  if (!phone) {
+    newErrors.guestPhone = 'Nomor telepon wajib diisi.'
+  } else if (!/^\+?[0-9]{10,15}$/.test(phone)) {
+    newErrors.guestPhone = 'Masukkan nomor telepon dengan 10–15 digit.'
+  }
 
+  if (
+    form.value.guestEmail &&
+    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.value.guestEmail)
+  ) {
+    newErrors.guestEmail = 'Format alamat email tidak valid.'
+  }
+
+  errors.value = newErrors
+
+  return Object.keys(newErrors).length === 0
 }
 
-
 // ======================================
-// 15. PROSES FORM
+// 6. STEP ONE: CHECK AVAILABILITY
 // ======================================
 
+const handleSubmit = async () => {
+  if (isSubmitting.value || isCreatingBooking.value) return
 
-async function handleSubmit(): Promise<void> {
-
-  // Tutup ringkasan sebelumnya
   isPreviewVisible.value = false
+  serverQuote.value = null
+  bookingError.value = ''
+  bookingResult.value = null
 
-  // Jalankan validasi form lokal
-  if (!validateForm()) {
-    return
-  }
+  if (!validateForm()) return
+  if (!selectedVilla.value) return
 
-  // Tampilkan loading
   isSubmitting.value = true
-
   availabilityStatus.value = 'idle'
-
   availabilityMessage.value = ''
 
   try {
-
-    // ==================================
-    // REQUEST KE BACKEND D1
-    // ==================================
-
-    const response =
-      await $fetch<AvailabilityCheckResponse>(
-        '/api/availability/check',
-        {
-          method: 'POST',
-
-          body: {
-
-            villaId: selectedVillaId.value,
-
-            checkIn: checkIn.value,
-
-            checkOut: checkOut.value
-
-          }
+    const response = await $fetch<AvailabilityCheckResponse>(
+      '/api/availability/check',
+      {
+        method: 'POST',
+        body: {
+          villaId: form.value.villaId,
+          checkIn: form.value.checkIn,
+          checkOut: form.value.checkOut
         }
-      )
-
-
-    // ==================================
-    // MEMBACA HASIL BACKEND
-    // ==================================
-
-    availabilityStatus.value =
-      response.available
-        ? 'available'
-        : 'unavailable'
-
-    availabilityMessage.value =
-      response.message
-
-
-    // Jika tanggal bertabrakan
-    if (!response.available) {
-
-      fieldErrors.value = {
-        ...fieldErrors.value,
-
-        checkOut: response.message
       }
-
-      return
-
-    }
-
-
-    // Jika tersedia, tampilkan preview
-    isPreviewVisible.value = true
-
-  } catch (error) {
-
-    console.error(
-      'Availability API error:',
-      error
     )
 
+    availabilityMessage.value = response.message
+
+    availabilityStatus.value = response.available
+      ? 'available'
+      : 'unavailable'
+
+    if (!response.available) {
+      errors.value.checkOut = response.message
+      return
+    }
+
+    serverQuote.value = response
+    isPreviewVisible.value = true
+
+  } catch (error: unknown) {
+    console.error('Booking availability error:', error)
+
     availabilityStatus.value = 'error'
-
-    availabilityMessage.value =
-      'Tidak dapat memeriksa ketersediaan. Silakan coba lagi.'
-
+    availabilityMessage.value = getApiErrorMessage(
+      error,
+      'Gagal memeriksa ketersediaan. Periksa koneksi dan coba kembali.'
+    )
   } finally {
-
-    // Selalu matikan loading
     isSubmitting.value = false
-
   }
-
 }
 
+// ======================================
+// 7. STEP TWO: CREATE BOOKING
+// ======================================
+
+const confirmBooking = async () => {
+  if (isCreatingBooking.value || isSubmitting.value) return
+
+  if (!validateForm()) {
+    isPreviewVisible.value = false
+    return
+  }
+
+  if (!selectedVilla.value || !serverQuote.value) {
+    bookingError.value =
+      'Silakan periksa ketersediaan villa terlebih dahulu.'
+
+    return
+  }
+
+  isCreatingBooking.value = true
+  bookingError.value = ''
+  bookingResult.value = null
+
+  try {
+    const payload: BookingCreateRequest = {
+      villaId: form.value.villaId,
+      guestName: form.value.guestName.trim(),
+      guestEmail: form.value.guestEmail.trim(),
+      guestPhone: form.value.guestPhone.trim(),
+      checkIn: form.value.checkIn,
+      checkOut: form.value.checkOut,
+      guestCount: form.value.guestCount,
+      specialRequest: form.value.specialRequest.trim() || null
+    }
+
+    const response = await createBooking(payload)
+
+    bookingResult.value = response.data
+
+    // Preview tidak lagi diperlukan setelah booking tersimpan.
+    isPreviewVisible.value = false
+
+  } catch (error: unknown) {
+    console.error('Create booking error:', error)
+
+    bookingError.value = getApiErrorMessage(
+      error,
+      'Reservasi gagal dibuat. Silakan coba kembali.'
+    )
+
+    // Jika tanggal baru saja dipesan pengunjung lain,
+    // minta pengunjung memeriksa ketersediaan lagi.
+    serverQuote.value = null
+    availabilityStatus.value = 'idle'
+    availabilityMessage.value = ''
+
+  } finally {
+    isCreatingBooking.value = false
+  }
+}
+
+// ======================================
+// 8. API ERROR HELPER
+// ======================================
+
+function getApiErrorMessage(
+  error: unknown,
+  fallback: string
+): string {
+  if (typeof error !== 'object' || error === null) {
+    return fallback
+  }
+
+  const apiError = error as {
+    data?: {
+      statusMessage?: string
+      message?: string
+    }
+    statusMessage?: string
+    message?: string
+  }
+
+  return (
+    apiError.data?.statusMessage ??
+    apiError.data?.message ??
+    apiError.statusMessage ??
+    apiError.message ??
+    fallback
+  )
+}
+
+// ======================================
+// 9. INITIALIZATION
+// ======================================
+
+onMounted(() => {
+  today.value = getTodayString()
+})
+
+// ✅ PERBAIKAN: state + fungsi untuk success screen
+const copied = ref(false)
+
+const copyBookingCode = async () => {
+  const code = bookingResult.value?.bookingCode
+  if (!code) return
+  try {
+    await navigator.clipboard.writeText(code)
+    copied.value = true
+    setTimeout(() => (copied.value = false), 2000)
+  } catch {
+    // fallback untuk browser lama
+    const ta = document.createElement('textarea')
+    ta.value = code
+    document.body.appendChild(ta)
+    ta.select()
+    document.execCommand('copy')
+    document.body.removeChild(ta)
+    copied.value = true
+    setTimeout(() => (copied.value = false), 2000)
+  }
+}
+
+// ✅ PERBAIKAN: warna badge sesuai status
+const statusClass = computed(() => {
+  const s = (bookingResult.value?.status ?? '').toLowerCase()
+  if (s === 'confirmed') return 'is-confirmed'
+  if (s === 'cancelled') return 'is-cancelled'
+  return 'is-pending' // default: pending
+})
+
+const statusLabel = computed(() => {
+  const s = (bookingResult.value?.status ?? '').toLowerCase()
+  if (s === 'confirmed') return 'Terkonfirmasi'
+  if (s === 'cancelled') return 'Dibatalkan'
+  return 'Menunggu Konfirmasi'
+})
 </script>
 
-
-
 <template>
-
   <section id="booking" class="booking-section">
-
     <div class="booking-container">
 
       <!-- HEADING -->
       <div class="booking-heading">
-
-        <span class="eyebrow">
-          RESERVATION
-        </span>
-
-        <h2>
-          Book Your
-          <span>Perfect Stay.</span>
-        </h2>
-
-        <p>
-          Pilih villa dan tanggal menginap untuk
-          melihat estimasi biaya reservasi.
-        </p>
-
+        <span class="eyebrow">RESERVATION</span>
+        <h2>Book Your <span>Perfect Stay.</span></h2>
+        <p>Pilih villa dan tanggal menginap untuk melihat estimasi biaya reservasi.</p>
       </div>
 
-
-        <div
-        v-if="villas.length === 0"
-        class="empty-state"
-        role="status"
-        >
+      <!-- ✅ STATE 1: EMPTY -->
+      <div v-if="villas.length === 0" class="empty-state" role="status">
         <span>🏡</span>
-
         <h3>Belum Ada Villa Tersedia</h3>
+        <p>Saat ini belum ada unit villa yang dapat dipesan. Silakan kembali lagi nanti.</p>
+      </div>
 
-        <p>
-            Saat ini belum ada unit villa yang dapat dipesan.
-            Silakan kembali lagi nanti.
-        </p>
+      <!-- ✅ STATE 2: SUCCESS (redesign premium) -->
+      <section v-if="bookingResult" class="booking-success" aria-live="polite">
+        <div class="success-hero">
+          <div class="success-icon" aria-hidden="true">
+            <svg viewBox="0 0 52 52">
+              <circle cx="26" cy="26" r="24" fill="none" stroke="#31855a" stroke-width="3"/>
+              <path fill="none" stroke="#31855a" stroke-width="4" stroke-linecap="round"
+                    d="M14 27l7 7 16-16"/>
+            </svg>
+          </div>
+          <h3>Reservasi Berhasil Dibuat!</h3>
+          <p>
+            Terima kasih, <strong>{{ bookingResult.guestName }}</strong>.
+            Data reservasi kamu sudah kami terima.
+          </p>
+          <span class="status-badge" :class="statusClass">
+            <i></i> {{ statusLabel }}
+          </span>
         </div>
 
-      <!-- BOOKING FORM -->
-    <form
-        v-else
+        <div class="booking-code-box">
+          <div class="booking-code-info">
+            <small>Kode Reservasi</small>
+            <strong class="booking-code">{{ bookingResult.bookingCode }}</strong>
+          </div>
+          <button type="button" class="copy-button" @click="copyBookingCode">
+            {{ copied ? '✓ Tersalin' : 'Salin Kode' }}
+          </button>
+        </div>
+
+        <div class="success-grid">
+          <div class="success-item">
+            <span>Villa</span>
+            <strong>{{ bookingResult.villaName }}</strong>
+          </div>
+          <div class="success-item">
+            <span>Jumlah Tamu</span>
+            <strong>{{ bookingResult.guestCount }} orang</strong>
+          </div>
+          <div class="success-item">
+            <span>Check-in</span>
+            <strong>{{ formatBookingDate(bookingResult.checkIn) }}</strong>
+          </div>
+          <div class="success-item">
+            <span>Check-out</span>
+            <strong>{{ formatBookingDate(bookingResult.checkOut) }}</strong>
+          </div>
+          <div class="success-item">
+            <span>Durasi</span>
+            <strong>{{ bookingResult.nights }} malam</strong>
+          </div>
+          <div class="success-item">
+            <span>Telepon</span>
+            <strong>{{ bookingResult.guestPhone }}</strong>
+          </div>
+          <div v-if="bookingResult.guestEmail" class="success-item full">
+            <span>Email</span>
+            <strong>{{ bookingResult.guestEmail }}</strong>
+          </div>
+        </div>
+
+        <div class="success-total">
+          <span>Total Reservasi</span>
+          <strong>{{ formatRupiah(bookingResult.totalPrice) }}</strong>
+        </div>
+
+        <p class="success-note">
+          Simpan kode reservasi di atas untuk keperluan komunikasi dan pembayaran selanjutnya.
+        </p>
+
+        <div class="success-actions">
+          <NuxtLink to="/#villas" class="success-btn success-btn-primary">
+            ← Lihat Villa Lain
+          </NuxtLink>
+          <NuxtLink to="/" class="success-btn success-btn-outline">
+            Kembali ke Beranda
+          </NuxtLink>
+        </div>
+      </section>
+
+      <!-- ✅ STATE 3: FORM (v-if mandiri) -->
+      <form
+        v-if="villas.length > 0 && !bookingResult && !isPreviewVisible"
         class="booking-form"
         novalidate
         @submit.prevent="handleSubmit"
-    >
-
+      >
         <!-- PILIH VILLA -->
         <div class="form-group full-width">
-
-          <label for="villa">
-            Pilih Villa
-          </label>
-
-        <select
-        id="villa"
-        v-model.number="selectedVillaId"
-        :disabled="villas.length === 0"
-        :aria-invalid="Boolean(fieldErrors.villa)"
-        required
-        >
-        <option
-            v-for="villa in villas"
-            :key="villa.id"
-            :value="villa.id"
-        >
-            {{ villa.name }} -
-            {{ formatRupiah(villa.pricePerNight) }} / malam
-        </option>
-        </select>
-
-        <small v-if="selectedVilla">
-        Kapasitas maksimum:
-        {{ selectedVilla.capacity }} orang
-        </small>
-
-        <small
-        v-if="fieldErrors.villa"
-        class="field-error"
-        >
-        {{ fieldErrors.villa }}
-        </small>
-
-
+          <label for="villa">Pilih Villa</label>
+          <select
+            id="villa"
+            v-model.number="form.villaId"
+            :aria-invalid="Boolean(errors.villaId)"
+            @change="clearError('villaId')"
+            required
+          >
+            <option v-for="villa in villas" :key="villa.id" :value="villa.id">
+              {{ villa.name }} - {{ formatRupiah(villa.pricePerNight) }} / malam
+            </option>
+          </select>
+          <small v-if="selectedVilla">Kapasitas maksimum: {{ selectedVilla.capacity }} orang</small>
+          <small v-if="errors.villaId" class="field-error">{{ errors.villaId }}</small>
         </div>
-
 
         <!-- CHECK-IN -->
         <div class="form-group">
-
-          <label for="checkIn">
-            Check-in
-          </label>
-
-        <input
-        id="checkIn"
-        v-model="checkIn"
-        type="date"
-        :min="today"
-        :aria-invalid="Boolean(fieldErrors.checkIn)"
-        aria-describedby="checkIn-help"
-        required
-        />
-
-        <small id="checkIn-help">
-        Tanggal mulai menginap
-        </small>
-
-        <small
-        v-if="fieldErrors.checkIn"
-        class="field-error"
-        >
-        {{ fieldErrors.checkIn }}
-        </small>
-
-
+          <label for="checkIn">Check-in</label>
+          <input
+            id="checkIn"
+            v-model="form.checkIn"
+            type="date"
+            :min="today"
+            :aria-invalid="Boolean(errors.checkIn)"
+            @input="clearError('checkIn')"
+            required
+          />
+          <small v-if="errors.checkIn" class="field-error">{{ errors.checkIn }}</small>
         </div>
-
 
         <!-- CHECK-OUT -->
         <div class="form-group">
-
-          <label for="checkOut">
-            Check-out
-          </label>
-
-                <input
-                id="checkOut"
-                v-model="checkOut"
-                type="date"
-                :min="minCheckOut"
-                :disabled="!checkIn"
-                :aria-invalid="Boolean(fieldErrors.checkOut)"
-                required
-                />
-
-                <small>
-                Minimal satu hari setelah check-in
-                </small>
-
-                <small
-                v-if="fieldErrors.checkOut"
-                class="field-error"
-                >
-                {{ fieldErrors.checkOut }}
-                </small>
+          <label for="checkOut">Check-out</label>
+          <input
+            id="checkOut"
+            v-model="form.checkOut"
+            type="date"
+            :min="minCheckOut"
+            :disabled="!form.checkIn"
+            :aria-invalid="Boolean(errors.checkOut)"
+            @input="clearError('checkOut')"
+            required
+          />
+          <small v-if="errors.checkOut" class="field-error">{{ errors.checkOut }}</small>
         </div>
 
-
+        <!-- AVAILABILITY MESSAGE -->
         <div
           v-if="availabilityMessage"
           class="availability-message"
-          :class="{
-            'is-unavailable':
-              availabilityStatus === 'unavailable' ||
-              availabilityStatus === 'error'
-          }"
+          :class="{ 'is-unavailable': availabilityStatus === 'unavailable' || availabilityStatus === 'error' }"
           role="status"
         >
-          <span>
-            {{ availabilityStatus === 'available' ? '✓' : '!' }}
-          </span>
-
+          <span>{{ availabilityStatus === 'available' ? '✓' : '!' }}</span>
           {{ availabilityMessage }}
         </div>
 
-
-
-
         <!-- JUMLAH TAMU -->
         <div class="form-group full-width">
-
-          <label for="guestCount">
-            Jumlah Tamu
-          </label>
-
-
-                <input
-                id="guestCount"
-                v-model.number="guestCount"
-                type="number"
-                min="1"
-                :max="maxGuests"
-                step="1"
-                :aria-invalid="Boolean(fieldErrors.guestCount)"
-                required
-                />
-
-                <small>
-                Maksimal {{ maxGuests }} orang untuk villa ini.
-                </small>
-
-                <small
-                v-if="fieldErrors.guestCount"
-                class="field-error"
-                >
-                {{ fieldErrors.guestCount }}
-                </small>
-
-
+          <label for="guestCount">Jumlah Tamu</label>
+          <input
+            id="guestCount"
+            v-model.number="form.guestCount"
+            type="number"
+            min="1"
+            :max="maxGuests"
+            step="1"
+            :aria-invalid="Boolean(errors.guestCount)"
+            @input="clearError('guestCount')"
+            required
+          />
+          <small>Maksimal {{ maxGuests }} orang untuk villa ini.</small>
+          <small v-if="errors.guestCount" class="field-error">{{ errors.guestCount }}</small>
         </div>
-
 
         <!-- INFORMASI PELANGGAN -->
-        <div class="form-divider full-width">
-          Informasi Pelanggan
-        </div>
-
+        <div class="form-divider full-width">Informasi Pelanggan</div>
 
         <div class="form-group full-width">
-
-          <label for="guestName">
-            Nama Lengkap
-          </label>
-
-          
-            <input
+          <label for="guestName">Nama Lengkap</label>
+          <input
             id="guestName"
-            v-model.trim="guestName"
+            v-model.trim="form.guestName"
             type="text"
             minlength="3"
             maxlength="100"
             placeholder="Masukkan nama lengkap"
             autocomplete="name"
-            :aria-invalid="Boolean(fieldErrors.guestName)"
+            :aria-invalid="Boolean(errors.guestName)"
+            @input="clearError('guestName')"
             required
-            />
-
-            <small
-            v-if="fieldErrors.guestName"
-            class="field-error"
-            >
-            {{ fieldErrors.guestName }}
-            </small>
-
+          />
+          <small v-if="errors.guestName" class="field-error">{{ errors.guestName }}</small>
         </div>
 
-
         <div class="form-group">
-
-          <label for="guestPhone">
-            Nomor Telepon / WhatsApp
-          </label>
-
-            <input
+          <label for="guestPhone">Nomor Telepon / WhatsApp</label>
+          <input
             id="guestPhone"
-            v-model.trim="guestPhone"
+            v-model.trim="form.guestPhone"
             type="tel"
             inputmode="tel"
             maxlength="20"
             placeholder="0812xxx"
             autocomplete="tel"
-            :aria-invalid="Boolean(fieldErrors.guestPhone)"
+            :aria-invalid="Boolean(errors.guestPhone)"
+            @input="clearError('guestPhone')"
             required
-            />
-
-            <small>
-            Contoh: 0812xxx atau +6281xxx
-            </small>
-
-            <small
-            v-if="fieldErrors.guestPhone"
-            class="field-error"
-            >
-            {{ fieldErrors.guestPhone }}
-            </small>
-
-
+          />
+          <small v-if="errors.guestPhone" class="field-error">{{ errors.guestPhone }}</small>
         </div>
 
-
         <div class="form-group">
-
-          <label for="guestEmail">
-            Email (Opsional)
-          </label>
-            <input
+          <label for="guestEmail">Email (Opsional)</label>
+          <input
             id="guestEmail"
-            v-model.trim="guestEmail"
+            v-model.trim="form.guestEmail"
             type="email"
             maxlength="254"
             placeholder="nama@email.com"
             autocomplete="email"
-            :aria-invalid="Boolean(fieldErrors.guestEmail)"
-            />
-
-            <small
-            v-if="fieldErrors.guestEmail"
-            class="field-error"
-            >
-            {{ fieldErrors.guestEmail }}
-            </small>
-
+            :aria-invalid="Boolean(errors.guestEmail)"
+            @input="clearError('guestEmail')"
+          />
+          <small v-if="errors.guestEmail" class="field-error">{{ errors.guestEmail }}</small>
         </div>
 
-
-        <!-- PERMINTAAN KHUSUS -->
         <div class="form-group full-width">
-
-          <label for="specialRequest">
-            Permintaan Khusus (Opsional)
-          </label>
-            <textarea
+          <label for="specialRequest">Permintaan Khusus (Opsional)</label>
+          <textarea
             id="specialRequest"
-            v-model.trim="specialRequest"
+            v-model.trim="form.specialRequest"
             rows="3"
             maxlength="500"
             placeholder="Contoh: membutuhkan extra bed..."
-            />
-
+            @input="clearError('specialRequest')"
+          />
         </div>
-
 
         <!-- RINGKASAN HARGA -->
         <div class="price-summary full-width">
-
-          <h3>
-            Estimasi Biaya
-          </h3>
-
+          <h3>Estimasi Biaya</h3>
           <div class="price-row">
-
             <span>Villa</span>
-
-            <strong>
-              {{ selectedVilla?.name ?? '-' }}
-            </strong>
-
+            <strong>{{ selectedVilla?.name ?? '-' }}</strong>
           </div>
-
           <div class="price-row">
-
             <span>Harga per malam</span>
-
-            <strong>
-              {{ formatRupiah(selectedVilla?.pricePerNight ?? 0) }}
-            </strong>
-
+            <strong>{{ formatRupiah(displayedPricePerNight) }}</strong>
           </div>
-
           <div class="price-row">
-
             <span>Durasi menginap</span>
-
-            <strong>
-              {{ numberOfNights }} malam
-            </strong>
-
+            <strong>{{ displayedNights }} malam</strong>
           </div>
-
           <div class="price-row">
-
             <span>Jumlah tamu</span>
-
-            <strong>
-              {{ guestCount }} orang
-            </strong>
-
+            <strong>{{ form.guestCount }} orang</strong>
           </div>
-
           <div class="price-total">
-
             <span>Estimasi Total</span>
-
-            <strong>
-              {{ formatRupiah(totalPrice) }}
-            </strong>
-
+            <strong>{{ formatRupiah(displayedTotalPrice) }}</strong>
           </div>
-
         </div>
 
-        <div
-        v-if="Object.keys(fieldErrors).length > 0"
-        class="error-summary full-width"
-        role="alert"
-        >
-        Ada beberapa informasi yang perlu diperbaiki.
-        Periksa kembali input yang ditandai sebelum melanjutkan.
+        <div v-if="Object.keys(errors).length > 0" class="error-summary full-width" role="alert">
+          Ada beberapa informasi yang perlu diperbaiki. Periksa kembali input yang ditandai.
         </div>
-
-
 
         <!-- SUBMIT BUTTON -->
         <div class="form-actions full-width">
-
-
-            <button
+          <button
             type="submit"
             class="submit-button"
             :disabled="isSubmitting || villas.length === 0"
             :aria-busy="isSubmitting"
-            >
-            <template v-if="isSubmitting">
-                <span class="loading-spinner"></span>
-                Memeriksa Reservasi...
-            </template>
-
-            <template v-else>
-                Tampilkan Ringkasan Reservasi →
-            </template>
-            </button>
-
-            <p>
-            Ini masih simulasi frontend dan belum menyimpan
-            reservasi ke database.
-            </p>
-
-
+          >
+            <span v-if="isSubmitting" class="loading-spinner"></span>
+            {{ isSubmitting ? 'Memeriksa Reservasi...' : 'Tampilkan Ringkasan Reservasi →' }}
+          </button>
+          <p>Periksa ketersediaan terlebih dahulu sebelum mengonfirmasi reservasi.</p>
         </div>
-
       </form>
 
+      <!-- ✅ bookingError -->
+      <div v-if="bookingError" class="error-summary" role="alert">
+        {{ bookingError }}
+      </div>
 
-      <!-- HASIL PREVIEW -->
+      <!-- ✅ STATE 4: PREVIEW (v-if mandiri) -->
       <div
-        v-if="isPreviewVisible && selectedVilla"
+        v-if="villas.length > 0 && !bookingResult && isPreviewVisible && selectedVilla"
         class="preview-card"
         aria-live="polite"
       >
-
         <div class="preview-heading">
           <span>✓</span>
-
           <div>
             <h3>Ringkasan Reservasi Berhasil Dibuat</h3>
-
-            <p>
-              Periksa kembali informasi berikut.
+            <p>Periksa kembali informasi berikut.</p>
+            <p v-if="serverQuote" class="quote-note">
+              Estimasi harga dihitung berdasarkan data villa yang diperoleh dari server.
+              Ini belum merupakan konfirmasi reservasi.
             </p>
           </div>
         </div>
 
-
         <div class="preview-details">
-
-          <div>
-            <span>Nama Pelanggan</span>
-            <strong>{{ guestName }}</strong>
-          </div>
-
-          <div>
-            <span>Nomor Telepon</span>
-            <strong>{{ guestPhone }}</strong>
-          </div>
-
-          <div v-if="guestEmail">
-            <span>Email</span>
-            <strong>{{ guestEmail }}</strong>
-          </div>
-
-          <div>
-            <span>Villa</span>
-            <strong>{{ selectedVilla.name }}</strong>
-          </div>
-
-          <div>
-            <span>Check-in</span>
-            <strong>{{ formatBookingDate(checkIn) }}</strong>
-          </div>
-
-          <div>
-            <span>Check-out</span>
-            <strong>{{ formatBookingDate(checkOut) }}</strong>
-          </div>
-
-          <div>
-            <span>Durasi</span>
-            <strong>{{ numberOfNights }} malam</strong>
-          </div>
-
-          <div>
-            <span>Jumlah Tamu</span>
-            <strong>{{ guestCount }} orang</strong>
-          </div>
-
+          <div><span>Nama Pelanggan</span><strong>{{ form.guestName }}</strong></div>
+          <div><span>Nomor Telepon</span><strong>{{ form.guestPhone }}</strong></div>
+          <div v-if="form.guestEmail"><span>Email</span><strong>{{ form.guestEmail }}</strong></div>
+          <div><span>Villa</span><strong>{{ selectedVilla.name }}</strong></div>
+          <div><span>Check-in</span><strong>{{ formatBookingDate(form.checkIn) }}</strong></div>
+          <div><span>Check-out</span><strong>{{ formatBookingDate(form.checkOut) }}</strong></div>
+          <div><span>Durasi</span><strong>{{ displayedNights }} malam</strong></div>
+          <div><span>Jumlah Tamu</span><strong>{{ form.guestCount }} orang</strong></div>
           <div class="preview-total">
             <span>Total Estimasi</span>
-            <strong>{{ formatRupiah(totalPrice) }}</strong>
+            <strong>{{ formatRupiah(displayedTotalPrice) }}</strong>
           </div>
-
         </div>
 
-        <p v-if="specialRequest">
-          <strong>Permintaan khusus:</strong>
-          {{ specialRequest }}
+        <p v-if="form.specialRequest">
+          <strong>Permintaan khusus:</strong> {{ form.specialRequest }}
         </p>
 
-        <div class="demo-notice">
-          <strong>Catatan:</strong>
-          Data ini baru ditampilkan di browser.
-          Belum tersimpan dan belum mengunci tanggal villa.
-          Masih dalam tahap development.
+        <div class="preview-actions">
+          <button
+            type="button"
+            class="submit-button"
+            :disabled="isCreatingBooking"
+            :aria-busy="isCreatingBooking"
+            @click="confirmBooking"
+          >
+            <span v-if="isCreatingBooking" class="loading-spinner"></span>
+            {{ isCreatingBooking ? 'Menyimpan Reservasi...' : 'Konfirmasi Reservasi' }}
+          </button>
+          <p>Reservasi akan disimpan setelah kamu menekan tombol konfirmasi.</p>
         </div>
-
       </div>
 
     </div>
-
   </section>
-
 </template>
-
 
 <style scoped>
 
-/* BOOKING SECTION */
+/* =================================
+   BOOKING SUCCESS (redesign)
+================================= */
+.booking-success {
+  margin-top: 10px;
+  padding: 40px 35px;
+  background: white;
+  border: 1px solid #d7e5d9;
+  border-radius: 16px;
+  box-shadow: 0 14px 40px rgba(24, 61, 50, 0.08);
+  animation: successIn 0.4s ease;
+}
 
+@keyframes successIn {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.success-hero {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.success-icon {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 16px;
+}
+
+.success-icon svg { width: 100%; height: 100%; }
+
+.success-icon circle {
+  stroke-dasharray: 151;
+  stroke-dashoffset: 151;
+  animation: drawCircle 0.5s ease forwards;
+}
+
+.success-icon path {
+  stroke-dasharray: 36;
+  stroke-dashoffset: 36;
+  animation: drawCheck 0.4s ease 0.45s forwards;
+}
+
+@keyframes drawCircle { to { stroke-dashoffset: 0; } }
+@keyframes drawCheck  { to { stroke-dashoffset: 0; } }
+
+.success-hero h3 {
+  margin: 0 0 8px;
+  color: #183d32;
+  font-family: Georgia, serif;
+  font-size: 24px;
+}
+
+.success-hero p {
+  margin: 0 auto 14px;
+  max-width: 420px;
+  color: #556058;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.success-hero p strong { color: #183d32; }
+
+/* Status badge */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+.status-badge i {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.status-badge.is-pending   { color: #9a6a1f; background: #fdf3e0; }
+.status-badge.is-confirmed { color: #286c4a; background: #edf7ef; }
+.status-badge.is-cancelled { color: #a52d2d; background: #fff0f0; }
+
+/* Booking code */
+.booking-code-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 22px;
+  margin-bottom: 26px;
+  background: #f5f7f3;
+  border: 1px dashed #cbd8cd;
+  border-radius: 12px;
+}
+
+.booking-code-info small {
+  display: block;
+  color: #869087;
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+
+.booking-code {
+  color: #183d32;
+  font-family: 'Courier New', monospace;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.copy-button {
+  padding: 9px 16px;
+  color: white;
+  background: #183d32;
+  border: none;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.2s;
+}
+
+.copy-button:hover { background: #0f2820; }
+
+/* Detail grid */
+.success-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 18px 24px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid #e9eee9;
+}
+
+.success-item { display: flex; flex-direction: column; gap: 5px; }
+.success-item.full { grid-column: 1 / -1; }
+.success-item span { color: #89918b; font-size: 11px; }
+.success-item strong {
+  color: #26352c;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+/* Total */
+.success-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 20px 0 6px;
+}
+
+.success-total span { color: #556058; font-size: 14px; }
+
+.success-total strong {
+  color: #183d32;
+  font-family: Georgia, serif;
+  font-size: 30px;
+}
+
+.success-note {
+  margin: 12px 0 24px;
+  color: #869087;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* Actions */
+.success-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.success-btn {
+  flex: 1;
+  padding: 14px;
+  border-radius: 9px;
+  text-align: center;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.success-btn-primary { background: #183d32; color: white; }
+.success-btn-primary:hover { background: #0f2820; transform: translateY(-1px); }
+
+.success-btn-outline {
+  background: transparent;
+  color: #183d32;
+  border: 2px solid #183d32;
+}
+.success-btn-outline:hover { background: #183d32; color: white; }
+
+@media (max-width: 600px) {
+  .booking-success { padding: 28px 20px; }
+  .booking-code-box { flex-direction: column; align-items: stretch; }
+  .copy-button { width: 100%; }
+  .success-grid { grid-template-columns: 1fr; }
+  .success-actions { flex-direction: column; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .booking-success { animation: none; }
+  .success-icon circle,
+  .success-icon path { animation: none; stroke-dashoffset: 0; }
+}
+
+.preview-actions {
+  margin-top: 25px;
+  text-align: center;
+}
+
+.preview-actions p {
+  margin-top: 12px;
+  color: #89918b;
+  font-size: 11px;
+}
+
+.booking-success {
+  border-color: #31855a;
+}
+
+.booking-success .preview-heading > span {
+  background: #31855a;
+}
+/* ✅ PERBAIKAN 5: CSS tetap sama, hanya dirapikan indentasinya agar konsisten */
 .booking-section {
   padding: 90px 24px;
   background: #f5f6f0;
@@ -1135,9 +1028,6 @@ async function handleSubmit(): Promise<void> {
   max-width: 850px;
   margin: auto;
 }
-
-
-/* HEADING */
 
 .booking-heading {
   margin-bottom: 35px;
@@ -1168,9 +1058,6 @@ async function handleSubmit(): Promise<void> {
   font-size: 14px;
   line-height: 1.8;
 }
-
-
-/* FORM */
 
 .booking-form {
   display: grid;
@@ -1208,13 +1095,14 @@ async function handleSubmit(): Promise<void> {
   border: 1px solid #dfe7df;
   border-radius: 7px;
   outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .form-group input:focus,
 .form-group select:focus,
 .form-group textarea:focus {
   border-color: #38765c;
-  box-shadow: 0 0 0 3px rgba(56, 118, 92, 0.10);
+  box-shadow: 0 0 0 3px rgba(56, 118, 92, 0.15); /* ✅ Dipertebal sedikit untuk aksesibilitas fokus */
 }
 
 .form-group input:disabled {
@@ -1235,9 +1123,6 @@ async function handleSubmit(): Promise<void> {
   font-weight: bold;
   border-bottom: 1px solid #e9eee9;
 }
-
-
-/* PRICE SUMMARY */
 
 .price-summary {
   margin-top: 5px;
@@ -1285,9 +1170,6 @@ async function handleSubmit(): Promise<void> {
   font-family: Georgia, serif;
 }
 
-
-/* BUTTON */
-
 .form-actions {
   text-align: center;
 }
@@ -1303,10 +1185,19 @@ async function handleSubmit(): Promise<void> {
   font-weight: bold;
   cursor: pointer;
   transition: background 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 
-.submit-button:hover {
-  background: #285849;
+.submit-button:hover:not(:disabled) {
+  background: #0f2820;
+}
+
+.submit-button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
 }
 
 .form-actions p {
@@ -1314,21 +1205,6 @@ async function handleSubmit(): Promise<void> {
   color: #89918b;
   font-size: 11px;
 }
-
-
-/* ERROR */
-
-.error-message {
-  padding: 14px;
-  color: #a52d2d;
-  background: #fff0f0;
-  border: 1px solid #f0cccc;
-  border-radius: 7px;
-  font-size: 13px;
-}
-
-
-/* PREVIEW */
 
 .preview-card {
   margin-top: 30px;
@@ -1412,40 +1288,6 @@ async function handleSubmit(): Promise<void> {
   line-height: 1.7;
 }
 
-
-/* RESPONSIVE */
-
-@media (max-width: 600px) {
-
-  .booking-section {
-    padding: 60px 16px;
-  }
-
-  .booking-form {
-    grid-template-columns: 1fr;
-    padding: 20px;
-    gap: 18px;
-  }
-
-  .preview-card {
-    padding: 20px;
-  }
-
-  .preview-details {
-    grid-template-columns: 1fr;
-  }
-
-  .preview-details .preview-total {
-    grid-column: auto;
-  }
-
-}
-
-
-/* =================================
-   EMPTY STATE
-================================= */
-
 .empty-state {
   padding: 45px 25px;
   background: white;
@@ -1469,11 +1311,6 @@ async function handleSubmit(): Promise<void> {
   line-height: 1.8;
 }
 
-
-/* =================================
-   FIELD ERRORS
-================================= */
-
 .field-error {
   color: #b42318 !important;
   font-size: 12px !important;
@@ -1486,11 +1323,6 @@ async function handleSubmit(): Promise<void> {
   background: #fffafa;
 }
 
-
-/* =================================
-   ERROR SUMMARY
-================================= */
-
 .error-summary {
   padding: 14px 16px;
   color: #a52d2d;
@@ -1500,11 +1332,6 @@ async function handleSubmit(): Promise<void> {
   font-size: 13px;
   line-height: 1.6;
 }
-
-
-/* =================================
-   AVAILABILITY MESSAGE
-================================= */
 
 .availability-message {
   display: flex;
@@ -1525,27 +1352,10 @@ async function handleSubmit(): Promise<void> {
   border-color: #f0cccc;
 }
 
-
-/* =================================
-   BUTTON DISABLED
-================================= */
-
-.submit-button:disabled {
-  opacity: 0.65;
-  cursor: not-allowed;
-}
-
-
-/* =================================
-   LOADING SPINNER
-================================= */
-
 .loading-spinner {
   display: inline-block;
   width: 15px;
   height: 15px;
-  margin-right: 8px;
-  vertical-align: middle;
   border: 2px solid rgba(255, 255, 255, 0.4);
   border-top-color: white;
   border-radius: 50%;
@@ -1553,52 +1363,26 @@ async function handleSubmit(): Promise<void> {
 }
 
 @keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
+  to { transform: rotate(360deg); }
 }
 
-
-/* =================================
-   SMALL MOBILE
-================================= */
+@media (max-width: 600px) {
+  .booking-section { padding: 60px 16px; }
+  .booking-form { grid-template-columns: 1fr; padding: 20px; gap: 18px; }
+  .preview-card { padding: 20px; }
+  .preview-details { grid-template-columns: 1fr; }
+  .preview-details .preview-total { grid-column: auto; }
+}
 
 @media (max-width: 420px) {
-
-  .price-summary {
-    padding: 18px;
-  }
-
-  .price-total {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .price-total strong {
-    font-size: 20px;
-  }
-
-  .submit-button {
-    padding: 14px 10px;
-    font-size: 12px;
-  }
-
-  .preview-heading h3 {
-    font-size: 15px;
-  }
-
+  .price-summary { padding: 18px; }
+  .price-total { align-items: flex-start; flex-direction: column; }
+  .price-total strong { font-size: 20px; }
+  .submit-button { padding: 14px 10px; font-size: 12px; }
+  .preview-heading h3 { font-size: 15px; }
 }
-
-
-/* REDUCE ANIMATION FOR ACCESSIBILITY */
 
 @media (prefers-reduced-motion: reduce) {
-
-  .loading-spinner {
-    animation: none;
-  }
-
+  .loading-spinner { animation: none; }
 }
-
-
 </style>

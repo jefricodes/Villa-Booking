@@ -1,7 +1,7 @@
 
 import { createError } from 'h3'
 
-import { getDatabase } from '../../utils/database'
+import { getD1 } from '../../utils/d1'
 
 import {
   mapVillaRow,
@@ -28,80 +28,65 @@ import {
 
 export default defineEventHandler(async (event) => {
 
-  // 1. Perlindungan development
+  // 1. Development only
   requireDevelopmentOnly()
 
 
-  // 2. Mengambil ID
+  // 2. Membaca ID
   const rawId = getRouterParam(event, 'id')
 
   const id = parseVillaId(rawId)
 
 
-  // 3. Membaca request
+  // 3. Membaca body
   const body = await readBody<unknown>(event)
 
 
-  // 4. Validasi hanya properti isActive
+  // 4. Validasi status
   const input = validateBody(
     body,
     updateVillaStatusSchema
   )
 
 
-  // 5. Membuka database
-  const db = getDatabase()
+  // 5. Mengambil D1
+  const db = getD1(event)
 
 
-  // 6. Memastikan villa tersedia
-  const existingVilla = db.prepare(`
-
-    SELECT id
-
-    FROM villas
-
-    WHERE id = ?
-
-  `).get(id)
-
-
-  if (!existingVilla) {
-
-    throw createError({
-
-      statusCode: 404,
-
-      statusMessage: 'Villa tidak ditemukan.'
-
-    })
-
-  }
-
-
-  // 7. Memperbarui status
-  db.prepare(`
+  // 6. Update status
+  const result = await db.prepare(`
 
     UPDATE villas
 
     SET
 
-      is_active = @isActive,
+      is_active = ?,
 
       updated_at = CURRENT_TIMESTAMP
 
-    WHERE id = @id
+    WHERE id = ?
 
-  `).run({
+  `)
+    .bind(
+      input.isActive ? 1 : 0,
+      id
+    )
+    .run()
 
-    id,
 
-    isActive: input.isActive ? 1 : 0
+  // 7. Memeriksa jumlah row yang berubah
+  if (result.meta.changes === 0) {
 
-  })
+    throw createError({
+      statusCode: 404,
+      statusMessage: 'Villa tidak ditemukan.'
+    })
+
+  }
 
 
   // 8. Mengambil data terbaru
-  const updatedVilla = db.prepare(`
+  const updatedVilla = await db.prepare(`
 
     SELECT
       ${VILLA_SELECT_COLUMNS}
@@ -110,23 +95,24 @@ export default defineEventHandler(async (event) => {
 
     WHERE id = ?
 
-  `).get(id) as VillaRow | undefined
+    LIMIT 1
+
+  `)
+    .bind(id)
+    .first<VillaRow>()
 
 
   if (!updatedVilla) {
 
     throw createError({
-
       statusCode: 404,
-
       statusMessage: 'Villa tidak ditemukan.'
-
     })
 
   }
 
 
-  // 9. Mengembalikan response
+  // 9. Response
   return {
 
     success: true,

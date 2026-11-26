@@ -1,7 +1,7 @@
 
 import { createError } from 'h3'
 
-import { getDatabase } from '../../utils/database'
+import { getD1 } from '../../utils/d1'
 
 import {
   mapVillaRow,
@@ -26,17 +26,17 @@ import {
 } from '../../utils/development-only'
 
 import {
-  isSqliteUniqueConstraintError
+  isD1UniqueConstraintError
 } from '../../utils/sqlite-errors'
 
 
 export default defineEventHandler(async (event) => {
 
-  // 1. Perlindungan development
+  // 1. Development only
   requireDevelopmentOnly()
 
 
-  // 2. Mengambil ID dari URL
+  // 2. Membaca ID
   const rawId = getRouterParam(event, 'id')
 
   const id = parseVillaId(rawId)
@@ -46,19 +46,19 @@ export default defineEventHandler(async (event) => {
   const body = await readBody<unknown>(event)
 
 
-  // 4. Memvalidasi seluruh data villa
+  // 4. Validasi seluruh data
   const input = validateBody(
     body,
     updateVillaSchema
   )
 
 
-  // 5. Membuka database
-  const db = getDatabase()
+  // 5. Membuka D1
+  const db = getD1(event)
 
 
-  // 6. Memastikan villa tersedia
-  const currentVilla = db.prepare(`
+  // 6. Memeriksa villa
+  const existingVilla = await db.prepare(`
 
     SELECT id
 
@@ -66,24 +66,25 @@ export default defineEventHandler(async (event) => {
 
     WHERE id = ?
 
-  `).get(id)
+    LIMIT 1
+
+  `)
+    .bind(id)
+    .first<{ id: number }>()
 
 
-  if (!currentVilla) {
+  if (!existingVilla) {
 
     throw createError({
-
       statusCode: 404,
-
       statusMessage: 'Villa tidak ditemukan.'
-
     })
 
   }
 
 
   // 7. Memeriksa slug duplikat
-  const duplicateSlug = db.prepare(`
+  const duplicateSlug = await db.prepare(`
 
     SELECT id
 
@@ -92,99 +93,99 @@ export default defineEventHandler(async (event) => {
     WHERE slug = ?
       AND id <> ?
 
-  `).get(input.slug, id)
+    LIMIT 1
+
+  `)
+    .bind(input.slug, id)
+    .first<{ id: number }>()
 
 
   if (duplicateSlug) {
 
     throw createError({
-
       statusCode: 409,
-
       statusMessage: 'Slug sudah digunakan villa lain.'
-
     })
 
   }
 
 
-  // 8. Menjalankan UPDATE
+  // 8. Memperbarui data
   try {
 
-    db.prepare(`
+    await db.prepare(`
 
       UPDATE villas
 
       SET
 
-        slug = @slug,
+        slug = ?,
 
-        name = @name,
+        name = ?,
 
-        price_per_night = @pricePerNight,
+        price_per_night = ?,
 
-        capacity = @capacity,
+        capacity = ?,
 
-        bedrooms = @bedrooms,
+        bedrooms = ?,
 
-        bathrooms = @bathrooms,
+        bathrooms = ?,
 
-        location = @location,
+        location = ?,
 
-        description = @description,
+        description = ?,
 
-        image_url = @imageUrl,
+        image_url = ?,
 
-        gallery_json = @galleryJson,
+        gallery_json = ?,
 
-        amenities_json = @amenitiesJson,
+        amenities_json = ?,
 
-        is_active = @isActive,
+        is_active = ?,
 
         updated_at = CURRENT_TIMESTAMP
 
-      WHERE id = @id
+      WHERE id = ?
 
-    `).run({
+    `)
+      .bind(
 
-      id,
+        input.slug,
 
-      slug: input.slug,
+        input.name,
 
-      name: input.name,
+        input.pricePerNight,
 
-      pricePerNight: input.pricePerNight,
+        input.capacity,
 
-      capacity: input.capacity,
+        input.bedrooms,
 
-      bedrooms: input.bedrooms,
+        input.bathrooms,
 
-      bathrooms: input.bathrooms,
+        input.location,
 
-      location: input.location,
+        input.description,
 
-      description: input.description,
+        input.imageUrl,
 
-      imageUrl: input.imageUrl,
+        JSON.stringify(input.gallery),
 
-      galleryJson: JSON.stringify(input.gallery),
+        JSON.stringify(input.amenities),
 
-      amenitiesJson: JSON.stringify(input.amenities),
+        input.isActive ? 1 : 0,
 
-      isActive: input.isActive ? 1 : 0
+        id
 
-    })
+      )
+      .run()
 
   } catch (error) {
 
-    if (isSqliteUniqueConstraintError(error)) {
+    if (isD1UniqueConstraintError(error)) {
 
       throw createError({
-
         statusCode: 409,
-
         statusMessage: 'Slug sudah digunakan villa lain.'
-
       })
 
     }
@@ -194,8 +195,8 @@ export default defineEventHandler(async (event) => {
   }
 
 
-  // 9. Mengambil data terbaru
-  const updatedVilla = db.prepare(`
+  // 9. Membaca hasil terbaru
+  const updatedVilla = await db.prepare(`
 
     SELECT
       ${VILLA_SELECT_COLUMNS}
@@ -204,23 +205,24 @@ export default defineEventHandler(async (event) => {
 
     WHERE id = ?
 
-  `).get(id) as VillaRow | undefined
+    LIMIT 1
+
+  `)
+    .bind(id)
+    .first<VillaRow>()
 
 
   if (!updatedVilla) {
 
     throw createError({
-
       statusCode: 404,
-
-      statusMessage: 'Villa tidak ditemukan setelah diperbarui.'
-
+      statusMessage: 'Villa tidak ditemukan.'
     })
 
   }
 
 
-  // 10. Mengirim response
+  // 10. Response
   return {
 
     success: true,

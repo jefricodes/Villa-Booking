@@ -1,7 +1,7 @@
 
 import { createError } from 'h3'
 
-import { getDatabase } from '../../utils/database'
+import { getD1 } from '../../utils/d1'
 
 import {
   parseVillaId
@@ -11,25 +11,35 @@ import {
   requireDevelopmentOnly
 } from '../../utils/development-only'
 
+import {
+  isD1ForeignKeyError
+} from '../../utils/sqlite-errors'
 
-export default defineEventHandler((event) => {
 
-  // 1. Perlindungan development
+interface VillaIdentity {
+  id: number
+  name: string
+}
+
+
+export default defineEventHandler(async (event) => {
+
+  // 1. Development only
   requireDevelopmentOnly()
 
 
-  // 2. Mengambil ID
+  // 2. Membaca ID
   const rawId = getRouterParam(event, 'id')
 
   const id = parseVillaId(rawId)
 
 
-  // 3. Membuka database
-  const db = getDatabase()
+  // 3. Mengambil D1
+  const db = getD1(event)
 
 
   // 4. Memastikan villa tersedia
-  const existingVilla = db.prepare(`
+  const villa = await db.prepare(`
 
     SELECT id, name
 
@@ -37,27 +47,25 @@ export default defineEventHandler((event) => {
 
     WHERE id = ?
 
-  `).get(id) as {
-    id: number
-    name: string
-  } | undefined
+    LIMIT 1
+
+  `)
+    .bind(id)
+    .first<VillaIdentity>()
 
 
-  if (!existingVilla) {
+  if (!villa) {
 
     throw createError({
-
       statusCode: 404,
-
       statusMessage: 'Villa tidak ditemukan.'
-
     })
 
   }
 
 
   // 5. Memeriksa riwayat booking
-  const bookingCount = db.prepare(`
+  const bookingCount = await db.prepare(`
 
     SELECT COUNT(*) AS total
 
@@ -65,23 +73,22 @@ export default defineEventHandler((event) => {
 
     WHERE villa_id = ?
 
-  `).get(id) as {
-    total: number
-  }
+  `)
+    .bind(id)
+    .first<{ total: number }>()
 
 
-  // 6. Menolak penghapusan jika memiliki booking
-  if (bookingCount.total > 0) {
+  if ((bookingCount?.total ?? 0) > 0) {
 
     throw createError({
 
       statusCode: 409,
 
       statusMessage:
-        'Villa memiliki riwayat reservasi dan tidak boleh dihapus.',
+        'Villa mempunyai riwayat reservasi dan tidak boleh dihapus.',
 
       data: {
-        bookingCount: bookingCount.total,
+        bookingCount: bookingCount?.total ?? 0,
         suggestion: 'Gunakan PATCH untuk menonaktifkan villa.'
       }
 
@@ -90,31 +97,97 @@ export default defineEventHandler((event) => {
   }
 
 
-  // 7. Menghapus villa
-  const result = db.prepare(`
+  // 6. Hapus villa
+  try {
 
-    DELETE FROM villas
+    const result = await db.prepare(`
 
-    WHERE id = ?
+      DELETE FROM villas
 
-  `).run(id)
+      WHERE id = ?
+
+        AND NOT EXISTS (
+
+          SELECT 1
+
+          FROM bookings
+
+          WHERE bookings.villa_id = villas.id
+
+        )
+
+    `)
+      .bind(id)
+      .run()
 
 
-  // 8. Memastikan ada data yang dihapus
-  if (result.changes !== 1) {
+    if (result.meta.changes !== 1) {
 
-    throw createError({
+      // Memeriksa apakah booking muncul
+      // sebelum proses DELETE diselesaikan
+      const latestBooking = await db.prepare(`
 
-      statusCode: 500,
+        SELECT COUNT(*) AS total
 
-      statusMessage: 'Villa gagal dihapus.'
+        FROM bookings
 
-    })
+        WHERE villa_id = ?
+
+      `)
+        .bind(id)
+        .first<{ total: number }>()
+
+
+      if ((latestBooking?.total ?? 0) > 0) {
+
+        throw createError({
+
+          statusCode: 409,
+
+          statusMessage:
+            'Villa memiliki riwayat reservasi dan tidak boleh dihapus.'
+
+        })
+
+      }
+
+      throw createError({
+
+        statusCode: 404,
+
+        statusMessage: 'Villa tidak ditemukan.'
+
+      })
+
+    }
+
+  } catch (error) {
+
+    if (
+      isD1ForeignKeyError(error) ||
+      (
+        error instanceof Error &&
+        error.message.includes('FOREIGN KEY constraint failed')
+      )
+    ) {
+
+      throw createError({
+
+        statusCode: 409,
+
+        statusMessage:
+          'Villa tidak dapat dihapus karena mempunyai riwayat reservasi.'
+
+      })
+
+    }
+
+    throw error
 
   }
 
 
-  // 9. Mengembalikan response
+  // 7. Response
   return {
 
     success: true,
@@ -122,8 +195,8 @@ export default defineEventHandler((event) => {
     message: 'Villa berhasil dihapus.',
 
     data: {
-      id: existingVilla.id,
-      name: existingVilla.name
+      id: villa.id,
+      name: villa.name
     }
 
   }

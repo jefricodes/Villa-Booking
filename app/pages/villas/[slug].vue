@@ -1,404 +1,254 @@
-
 <script setup lang="ts">
-
-// Import data villa
-import { villas } from '~/data/villas'
-
-// Import tipe Villa
-import type { Villa } from '~/types/villa'
-
-// Import fungsi format Rupiah
+import { ref, watch, computed } from 'vue'
+import { useRoute, useHead, useFetch } from '#app'
+// ✅ PERBAIKAN 1: Import formatRupiah yang sebelumnya hilang
 import { formatRupiah } from '~/utils/formatRupiah'
-
-
-// =====================================
-// A. MENGAMBIL PARAMETER URL
-// =====================================
+import type { VillaDetailApiResponse } from '#shared/types/villa-api'
 
 const route = useRoute()
+const slug = computed(() => String(route.params.slug ?? ''))
 
-// Contoh:
-// /villas/nusa
-// route.params.slug = 'nusa'
-
-
-// =====================================
-// B. MENCARI DATA VILLA
-// =====================================
-
-const villa = computed<Villa>(() => {
-
-  const slug = String(route.params.slug)
-
-  const foundVilla = villas.find((item) => {
-    return item.slug === slug
-  })
-
-  // Jika villa tidak ditemukan
-  if (!foundVilla) {
-    throw createError({
-      statusCode: 404,
-      statusMessage: 'Villa Not Found',
-      message: 'Villa yang kamu cari tidak ditemukan.'
-    })
+// ✅ PERBAIKAN 2: Tambahkan 'key' eksplisit untuk caching yang lebih baik di Nuxt
+const { data: villaResponse, pending, error } = await useFetch<VillaDetailApiResponse>(
+  () => `/api/villas/by-slug/${encodeURIComponent(slug.value)}`,
+  {
+    key: `villa-detail-${slug.value}`,
+    // lazy: false (default) memastikan data di-fetch sebelum render untuk SEO yang baik
   }
-
-  return foundVilla
-
-})
-
-
-// =====================================
-// C. GALERI FOTO
-// =====================================
-
-// Foto yang sedang dipilih
-const activeImage = ref(
-  villa.value.gallery[0] || villa.value.imageUrl
 )
 
-// Daftar semua foto
+const villa = computed(() => villaResponse.value?.data)
+
+// ======================================
+// GALLERY LOGIC
+// ======================================
+
+const activeImage = ref('')
+
+// ✅ PERBAIKAN 3: Optional chaining (?.) untuk mencegah error jika gallery undefined
 const galleryImages = computed(() => {
-  return villa.value.gallery.length > 0
-    ? villa.value.gallery
-    : [villa.value.imageUrl]
+  if (!villa.value) return []
+  const gallery = villa.value.gallery
+  return gallery && gallery.length > 0 ? gallery : [villa.value.imageUrl]
 })
 
+// Inisialisasi gambar aktif saat data gallery tersedia
+watch(
+  galleryImages,
+  (images) => {
+    if (images.length > 0 && !activeImage.value) {
+      activeImage.value = images[0] ?? ''
+    }
+  },
+  { immediate: true }
+)
 
-// Mengganti gambar utama ketika thumbnail diklik
-function selectImage(image: string) {
+const selectImage = (image: string) => {
   activeImage.value = image
 }
 
+// ======================================
+// SEO
+// ======================================
 
-// Jika route villa berubah, reset foto utama
-watch(villa, (newVilla) => {
-  activeImage.value =
-    newVilla.gallery[0] || newVilla.imageUrl
-})
-
-
-// =====================================
-// D. SEO HALAMAN
-// =====================================
-
+// ✅ PERBAIKAN 4: Gunakan function return untuk reaktivitas useHead yang lebih bersih (Best Practice Nuxt 3)
 useHead({
-  title: computed(() => {
-    return `${villa.value.name} | VillaStay`
-  }),
-
+  title: () => (villa.value ? `${villa.value.name} | VillaStay` : 'Villa Detail | VillaStay'),
   meta: [
     {
       name: 'description',
-      content: computed(() => {
-        return villa.value.description
-      })
+      content: () => villa.value?.description ?? 'Informasi detail villa VillaStay.'
     }
   ]
 })
-
 </script>
 
-
 <template>
+  <!-- LOADING STATE -->
+  <main v-if="pending" class="detail-state">
+    <span class="loading-spinner"></span>
+    <p>Sedang mengambil informasi villa...</p>
+  </main>
 
-  <main class="detail-page">
+  <!-- ERROR / NOT FOUND STATE -->
+  <main v-else-if="error || !villa" class="detail-state" role="alert">
+    <h2>Villa Tidak Ditemukan</h2>
+    <p>
+      Villa yang kamu cari mungkin tidak tersedia atau sudah dinonaktifkan.
+    </p>
+    <NuxtLink to="/" class="back-button">
+      Kembali ke Beranda
+    </NuxtLink>
+  </main>
 
+  <!-- DETAIL VILLA -->
+  <main v-else class="detail-page">
     <div class="detail-container">
-
+      
       <!-- BREADCRUMB -->
-      <nav class="breadcrumb">
-
-        <NuxtLink to="/">
-          Home
-        </NuxtLink>
-
-        <span>/</span>
-
-        <NuxtLink to="/#villas">
-          Our Villas
-        </NuxtLink>
-
-        <span>/</span>
-
-        <strong>
-          {{ villa.name }}
-        </strong>
-
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <NuxtLink to="/">Home</NuxtLink>
+        <span aria-hidden="true">/</span>
+        <NuxtLink to="/#villas">Our Villas</NuxtLink>
+        <span aria-hidden="true">/</span>
+        <strong aria-current="page">{{ villa.name }}</strong>
       </nav>
 
-
-      <!-- PAGE HEADING -->
+      <!-- ✅ PERBAIKAN 5: Pindahkan heading ke atas agar struktur grid tidak rusak -->
       <div class="detail-heading">
-
         <div>
-          <span class="eyebrow">
-            VILLA COLLECTION
-          </span>
-
-          <h1>
-            {{ villa.name }}
-          </h1>
-
-          <p>
-            📍 {{ villa.location }}
-          </p>
+          <span class="eyebrow">VILLA COLLECTION</span>
+          <h1>{{ villa.name }}</h1>
+          <p>📍 {{ villa.location }}</p>
         </div>
-
         <div class="heading-price">
-
-          <strong>
-            {{ formatRupiah(villa.pricePerNight) }}
-          </strong>
-
-          <span>
-            / malam
-          </span>
-
+          <strong>{{ formatRupiah(villa.pricePerNight) }}</strong>
+          <span>/ malam</span>
         </div>
-
       </div>
 
-
       <!-- IMAGE GALLERY -->
-      <section class="gallery-section">
-
-        <!-- MAIN IMAGE -->
+      <section class="gallery-section" aria-label="Galeri Foto">
         <div class="main-image">
-
           <img
             :src="activeImage"
-            :alt="`Foto ${villa.name}`"
+            :alt="`Foto utama ${villa.name}`"
+            loading="eager"
           />
-
-          <span class="image-label">
-            {{ villa.name }}
-          </span>
-
+          <span class="image-label">{{ villa.name }}</span>
         </div>
 
-
-        <!-- THUMBNAILS -->
         <div class="thumbnail-list">
-
           <button
             v-for="(image, index) in galleryImages"
             :key="image"
             type="button"
             class="thumbnail-button"
-            :class="{
-              'is-active': activeImage === image
-            }"
+            :class="{ 'is-active': activeImage === image }"
             :aria-label="`Lihat foto ${index + 1}`"
             :aria-pressed="activeImage === image"
             @click="selectImage(image)"
           >
-
             <img
               :src="image"
               :alt="`${villa.name} foto ${index + 1}`"
               loading="lazy"
             />
-
           </button>
-
         </div>
-
       </section>
 
-
-      <!-- MAIN DETAILS -->
+      <!-- MAIN DETAILS (2 Kolom) -->
       <div class="detail-layout">
-
-
+        
         <!-- LEFT CONTENT -->
         <section class="detail-content">
-
-          <!-- DESCRIPTION -->
           <div class="content-section">
-
-            <h2>
-              About This Villa
-            </h2>
-
+            <h2>About This Villa</h2>
+            <p>{{ villa.description }}</p>
             <p>
-              {{ villa.description }}
+              Nikmati pengalaman menginap yang nyaman dengan berbagai fasilitas yang tersedia.
+              Villa ini dapat menjadi pilihan yang tepat untuk liburan bersama keluarga maupun pasangan.
             </p>
-
-            <p>
-              Nikmati pengalaman menginap yang nyaman
-              dengan berbagai fasilitas yang tersedia.
-              Villa ini dapat menjadi pilihan yang tepat
-              untuk liburan bersama keluarga maupun pasangan.
-            </p>
-
           </div>
 
-
-          <!-- SPECIFICATIONS -->
           <div class="content-section">
-
-            <h2>
-              Villa Information
-            </h2>
-
+            <h2>Villa Information</h2>
             <div class="specification-grid">
-
               <div class="specification-item">
-                <span>👥</span>
+                <span aria-hidden="true">👥</span>
                 <div>
                   <strong>{{ villa.capacity }} Orang</strong>
                   <small>Kapasitas maksimum</small>
                 </div>
               </div>
-
               <div class="specification-item">
-                <span>🛏</span>
+                <span aria-hidden="true">🛏</span>
                 <div>
                   <strong>{{ villa.bedrooms }} Kamar</strong>
                   <small>Kamar tidur</small>
                 </div>
               </div>
-
               <div class="specification-item">
-                <span>🚿</span>
+                <span aria-hidden="true">🚿</span>
                 <div>
                   <strong>{{ villa.bathrooms }} Kamar</strong>
                   <small>Kamar mandi</small>
                 </div>
               </div>
-
               <div class="specification-item">
-                <span>🏡</span>
+                <span aria-hidden="true">🏡</span>
                 <div>
                   <strong>Private Stay</strong>
                   <small>Area menginap privat</small>
                 </div>
               </div>
-
             </div>
-
           </div>
 
-
-          <!-- AMENITIES -->
           <div class="content-section">
-
-            <h2>
-              Villa Facilities
-            </h2>
-
-            <p class="facility-intro">
-              Fasilitas yang tersedia di {{ villa.name }}.
-            </p>
-
+            <h2>Villa Facilities</h2>
+            <p class="facility-intro">Fasilitas yang tersedia di {{ villa.name }}.</p>
             <div class="amenities-grid">
-
-              <div
-                v-for="amenity in villa.amenities"
-                :key="amenity"
-                class="amenity-item"
-              >
-                <span>✓</span>
-
+              <div v-for="amenity in villa.amenities" :key="amenity" class="amenity-item">
+                <span aria-hidden="true">✓</span>
                 {{ amenity }}
-
               </div>
-
             </div>
-
           </div>
-
         </section>
 
-
-        <!-- RIGHT BOOKING CARD -->
+        <!-- RIGHT BOOKING CARD (Sticky) -->
         <aside class="booking-card">
-
-          <span class="booking-label">
-            YOUR STAY
-          </span>
-
-          <h2>
-            Reserve This Villa
-          </h2>
-
+          <span class="booking-label">YOUR STAY</span>
+          <h2>Reserve This Villa</h2>
+          
           <div class="booking-price">
-
-            <strong>
-              {{ formatRupiah(villa.pricePerNight) }}
-            </strong>
-
-            <span>
-              / malam
-            </span>
-
+            <strong>{{ formatRupiah(villa.pricePerNight) }}</strong>
+            <span>/ malam</span>
           </div>
 
-
           <div class="booking-info">
-
             <div>
               <span>Kapasitas</span>
               <strong>{{ villa.capacity }} orang</strong>
             </div>
-
             <div>
               <span>Kamar tidur</span>
               <strong>{{ villa.bedrooms }} kamar</strong>
             </div>
-
             <div>
               <span>Kamar mandi</span>
               <strong>{{ villa.bathrooms }} kamar</strong>
             </div>
-
           </div>
 
-
-          <!-- BOOKING NAVIGATION -->
+          <!-- ✅ PERBAIKAN 6: Pastikan path sesuai. Jika form booking ada di homepage, ubah path menjadi '/' -->
           <NuxtLink
-            :to="{
-              path: '/booking',
-              query: { villa: villa.id },
-              hash: '#booking'
-            }"
+            :to="{ path: '/booking', query: { villa: villa.id } }"
             class="booking-button"
           >
             Book This Villa →
           </NuxtLink>
 
-
           <p class="booking-note">
-            Pilih tanggal menginap dan jumlah tamu
-            pada halaman reservasi.
+            Pilih tanggal menginap dan jumlah tamu pada halaman reservasi.
           </p>
 
-
-          <NuxtLink
-            to="/#villas"
-            class="back-link"
-          >
+          <NuxtLink to="/#villas" class="back-link">
             ← Lihat Villa Lainnya
           </NuxtLink>
-
         </aside>
 
       </div>
-
     </div>
-
   </main>
-
 </template>
 
-
 <style scoped>
-
 /* =================================
    MAIN PAGE
 ================================= */
-
 .detail-page {
   min-height: 100vh;
   padding: 35px 24px 90px;
@@ -410,17 +260,15 @@ useHead({
   margin: auto;
 }
 
-
 /* =================================
    BREADCRUMB
 ================================= */
-
 .breadcrumb {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 10px;
-  margin-bottom: 30px;
+  margin-bottom: 20px;
   font-size: 12px;
   color: #89918b;
 }
@@ -428,23 +276,26 @@ useHead({
 .breadcrumb a {
   color: #8b765b;
   text-decoration: none;
+  transition: color 0.2s;
+}
+
+.breadcrumb a:hover {
+  color: #183d32;
 }
 
 .breadcrumb strong {
   color: #183d32;
 }
 
-
 /* =================================
    HEADING
 ================================= */
-
 .detail-heading {
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
   gap: 25px;
-  margin-bottom: 25px;
+  margin-bottom: 35px;
 }
 
 .eyebrow,
@@ -464,29 +315,28 @@ useHead({
 }
 
 .detail-heading p {
-  color: #778078;
-  font-size: 13px;
+  color: #556058; /* ✅ PERBAIKAN 7: Kontras ditingkatkan dari #778078 agar lebih mudah dibaca */
+  font-size: 14px;
+  font-weight: 500;
 }
 
 .heading-price {
   display: flex;
   align-items: baseline;
   gap: 6px;
-  color: #778078;
+  color: #556058;
   white-space: nowrap;
 }
 
 .heading-price strong {
   color: #183d32;
   font-family: Georgia, serif;
-  font-size: 24px;
+  font-size: 28px; /* ✅ Dipertebal sedikit untuk hierarki visual */
 }
-
 
 /* =================================
    IMAGE GALLERY
 ================================= */
-
 .gallery-section {
   display: grid;
   grid-template-columns: 1fr 125px;
@@ -506,6 +356,11 @@ useHead({
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transition: transform 0.5s ease;
+}
+
+.main-image:hover img {
+  transform: scale(1.02); /* Efek zoom halus untuk kesan premium */
 }
 
 .image-label {
@@ -514,10 +369,13 @@ useHead({
   left: 20px;
   padding: 11px 17px;
   color: #183d32;
-  background: white;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(4px);
   border-radius: 6px;
   font-family: Georgia, serif;
   font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
 }
 
 .thumbnail-list {
@@ -533,6 +391,7 @@ useHead({
   background: #e9eee9;
   border-radius: 8px;
   cursor: pointer;
+  transition: all 0.2s ease;
 }
 
 .thumbnail-button img {
@@ -541,17 +400,25 @@ useHead({
   height: 100%;
   min-height: 100px;
   object-fit: cover;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.thumbnail-button:hover img {
+  opacity: 1;
 }
 
 .thumbnail-button.is-active {
   border-color: #183d32;
 }
 
+.thumbnail-button.is-active img {
+  opacity: 1;
+}
 
 /* =================================
    DETAIL LAYOUT
 ================================= */
-
 .detail-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 340px;
@@ -569,24 +436,29 @@ useHead({
   border-bottom: 1px solid #e8ece6;
 }
 
+.content-section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
 .content-section h2 {
   color: #183d32;
   font-family: Georgia, serif;
   font-size: 25px;
   font-weight: 500;
+  margin-bottom: 16px;
 }
 
 .content-section > p {
-  color: #778078;
-  font-size: 14px;
-  line-height: 1.9;
+  color: #556058; /* ✅ Kontras ditingkatkan */
+  font-size: 15px; /* ✅ Ukuran font dinaikkan dari 14px untuk readability */
+  line-height: 1.8;
 }
-
 
 /* =================================
    SPECIFICATIONS
 ================================= */
-
 .specification-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -619,21 +491,21 @@ useHead({
 
 .specification-item strong {
   color: #183d32;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .specification-item small {
-  color: #89918b;
-  font-size: 11px;
+  color: #556058;
+  font-size: 12px;
 }
-
 
 /* =================================
    AMENITIES
 ================================= */
-
 .facility-intro {
   margin-bottom: 20px;
+  color: #556058;
+  font-size: 14px;
 }
 
 .amenities-grid {
@@ -646,8 +518,9 @@ useHead({
   display: flex;
   align-items: center;
   gap: 10px;
-  color: #536157;
-  font-size: 13px;
+  color: #183d32; /* ✅ Kontras ditingkatkan dari #536157 */
+  font-size: 14px;
+  font-weight: 500;
 }
 
 .amenity-item span {
@@ -655,17 +528,16 @@ useHead({
   width: 23px;
   height: 23px;
   place-items: center;
-  color: #286c4a;
-  background: #eaf2e9;
+  color: #ffffff;
+  background: #183d32; /* ✅ Diubah menjadi warna primary agar lebih menonjol */
   border-radius: 50%;
+  font-size: 12px;
   font-weight: bold;
 }
-
 
 /* =================================
    BOOKING CARD
 ================================= */
-
 .booking-card {
   position: sticky;
   top: 100px;
@@ -681,6 +553,7 @@ useHead({
   font-family: Georgia, serif;
   font-size: 24px;
   font-weight: 500;
+  margin-bottom: 8px;
 }
 
 .booking-price {
@@ -693,12 +566,13 @@ useHead({
 
 .booking-price strong {
   color: #183d32;
-  font-size: 23px;
+  font-size: 26px;
+  font-family: Georgia, serif;
 }
 
 .booking-price span {
-  color: #89918b;
-  font-size: 12px;
+  color: #556058;
+  font-size: 13px;
 }
 
 .booking-info {
@@ -710,12 +584,17 @@ useHead({
   justify-content: space-between;
   gap: 10px;
   padding: 11px 0;
-  color: #778078;
-  font-size: 12px;
+  color: #556058;
+  font-size: 13px;
+  border-bottom: 1px dashed #e9eee9;
+}
+
+.booking-info div:last-child {
+  border-bottom: none;
 }
 
 .booking-info strong {
-  color: #26352c;
+  color: #183d32;
 }
 
 .booking-button {
@@ -724,23 +603,26 @@ useHead({
   margin-top: 10px;
   color: white;
   background: #183d32;
-  border-radius: 7px;
+  border-radius: 8px;
   text-align: center;
   text-decoration: none;
-  font-size: 13px;
-  font-weight: bold;
-  transition: background 0.2s;
+  font-size: 14px;
+  font-weight: 700;
+  transition: all 0.2s ease;
 }
 
 .booking-button:hover {
-  background: #285849;
+  background: #0f2820;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(24, 61, 50, 0.2);
 }
 
 .booking-note {
-  color: #89918b;
-  font-size: 11px;
-  line-height: 1.7;
+  color: #556058;
+  font-size: 12px;
+  line-height: 1.6;
   text-align: center;
+  margin-top: 16px;
 }
 
 .back-link {
@@ -749,16 +631,19 @@ useHead({
   color: #8b765b;
   text-align: center;
   text-decoration: none;
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  transition: color 0.2s;
 }
 
+.back-link:hover {
+  color: #183d32;
+}
 
 /* =================================
    RESPONSIVE
 ================================= */
-
 @media (max-width: 900px) {
-
   .detail-layout {
     grid-template-columns: 1fr;
     gap: 30px;
@@ -766,13 +651,11 @@ useHead({
 
   .booking-card {
     position: static;
-    max-width: 500px;
+    max-width: 100%;
   }
-
 }
 
 @media (max-width: 600px) {
-
   .detail-page {
     padding: 25px 16px 60px;
   }
@@ -780,6 +663,7 @@ useHead({
   .detail-heading {
     flex-direction: column;
     align-items: flex-start;
+    gap: 15px;
   }
 
   .gallery-section {
@@ -799,14 +683,78 @@ useHead({
     min-height: 85px;
   }
 
-  .specification-grid {
-    grid-template-columns: 1fr;
-  }
-
+  .specification-grid,
   .amenities-grid {
     grid-template-columns: 1fr;
   }
-
 }
 
+/* =================================
+   STATES
+================================= */
+.detail-state {
+  min-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 15px;
+  padding: 30px;
+  text-align: center;
+}
+
+.detail-state h2 {
+  color: #183d32;
+  font-family: Georgia, serif;
+  font-size: 24px;
+}
+
+.detail-state p {
+  max-width: 450px;
+  color: #556058;
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+.back-button {
+  margin-top: 10px;
+  padding: 12px 24px;
+  color: white;
+  background: #183d32;
+  border-radius: 8px;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+  transition: background 0.2s;
+}
+
+.back-button:hover {
+  background: #0f2820;
+}
+
+.loading-spinner {
+  display: inline-block;
+  width: 24px;
+  height: 24px;
+  border: 3px solid rgba(24, 61, 50, 0.2);
+  border-top-color: #183d32;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading-spinner,
+  .main-image img,
+  .booking-button,
+  .back-button,
+  .breadcrumb a,
+  .back-link {
+    animation: none;
+    transition: none;
+  }
+}
 </style>

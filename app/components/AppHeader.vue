@@ -21,7 +21,7 @@ const closeMenu = () => {
       </NuxtLink>
 
       <!-- Navigation -->
-      
+
       <nav
         id="main-navigation"
         class="navigation"
@@ -35,12 +35,14 @@ const closeMenu = () => {
           Home
         </NuxtLink>
 
+
         <NuxtLink
           :to="{ path: '/', hash: '#villas' }"
           @click="closeMenu"
         >
           Our Villas
         </NuxtLink>
+
 
         <NuxtLink
           :to="{ path: '/', hash: '#facilities' }"
@@ -49,8 +51,9 @@ const closeMenu = () => {
           Facilities
         </NuxtLink>
 
+
         <NuxtLink
-          :to="{ path: '/', hash:'#booking'}"
+          :to="{ path: '/', hash: '#booking' }"
           @click="closeMenu"
         >
           Contact

@@ -1,4 +1,9 @@
 <script setup lang="ts">
+import type { VillasApiResponse } from '#shared/types/villa-api'
+const {data: villasResponse} = await useFetch<VillasApiResponse>(
+  '/api/villas', {key: 'public-villas'}
+)
+const villas = computed(() => villasResponse.value?.data ?? [])
 useHead({
   title: 'Booking | VillaStay',
   meta: [
@@ -12,6 +17,6 @@ useHead({
 
 <template>
   <main>
-    <BookingForm />
+    <BookingForm :villas="villas" />
   </main>
 </template>

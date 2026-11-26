@@ -1,46 +1,73 @@
 <script setup lang="ts">
+import type { VillasApiResponse } from '#shared/types/villa-api'
 
-import { villas } from '~/data/villas'
+// ======================================
+// 1. DATA FETCHING (Nuxt 3 Best Practice)
+// ======================================
+const {
+  data: villaResponse,
+  pending: villasPending,
+  error: villasError,
+  refresh: refreshVillas
+} = await useFetch<VillasApiResponse>('/api/villas', {
+  key: 'public-villas',
+  default: () => ({ success: true, count: 0, data: [] })
+})
 
-const facilities = [
+// Computed property untuk mengambil array villa dengan aman
+const villas = computed(() => villaResponse.value?.data ?? [])
+
+// ======================================
+// 2. DATA FASILITAS (Dengan Typing yang Jelas)
+// ======================================
+interface Facility {
+  icon: string
+  title: string
+  description: string
+}
+
+const facilities: Facility[] = [
   {
     icon: '🏊',
     title: 'Private Swimming Pool',
-    description: 'Enjoy a private swimming pool in a cozy and relaxing atmosphere'
+    description: 'Nikmati kolam renang pribadi dengan suasana yang nyaman.'
   },
   {
     icon: '📶',
     title: 'Free WiFi',
-    description: 'Stay connected while enjoying your holiday.'
+    description: 'Tetap terhubung selama menikmati waktu liburan.'
   },
   {
     icon: '❄️',
     title: 'Air Conditioning',
-    description: 'Enjoy a cool and comfortable room atmosphere.'
+    description: 'Nikmati suasana kamar yang sejuk dan nyaman.'
   },
   {
     icon: '🍳',
     title: 'Private Kitchen',
-    description: 'Kitchen facilities equipped for your cooking needs.'
+    description: 'Fasilitas dapur untuk kebutuhan memasak.'
   },
   {
     icon: '🚗',
     title: 'Private Parking',
-    description: 'Dedicated parking area for guest vehicles.'
+    description: 'Area parkir untuk kendaraan tamu.'
   },
   {
     icon: '🛏️',
     title: 'Comfortable Bedroom',
-    description: 'A bedroom thoughtfully designed for quality rest.'
+    description: 'Kamar yang dirancang untuk waktu istirahat berkualitas.'
   }
 ]
 
+// ======================================
+// 3. SEO
+// ======================================
 useHead({
   title: 'VillaStay | Premium Villa Booking',
   meta: [
     {
       name: 'description',
-      content: 'Find the best villas for a comfortable and memorable holiday experience.'
+      content: 'Temukan villa terbaik untuk pengalaman liburan yang nyaman dan tak terlupakan.'
     }
   ]
 })
@@ -48,151 +75,199 @@ useHead({
 
 <template>
   <main>
-
-      <!-- HERO SECTION -->
-      <section id="home" class="hero">
-        <div class="hero-container">
-          <div class="hero-content">
-            <span class="eyebrow">✦ YOUR PRIVATE ESCAPE</span>
-            <h1>
-              Experience
-              <span>Comfort</span>
-              & Beautiful Living.
-            </h1>
-            <p>
-              Discover a different kind of stay. Enjoy comfort, privacy, and an unforgettable holiday atmosphere with us.
-            </p>
-
-            <div class="hero-actions">
-
-              <NuxtLink to="#booking" class="button button-primary">
-                Book Now →
-              </NuxtLink>
-
-              <NuxtLink to="#villas" class="button button-outline">
-                Explore Our Villas
-              </NuxtLink>
-            </div>
-
-            <div class="hero-statistics">
-              <div>
-                <strong>05</strong>
-                <span>Villa Units</span>
-              </div>
-              <div>
-                <strong>100%</strong>
-                <span>Private Stay</span>
-              </div>
-              <div>
-                <strong>24/7</strong>
-                <span>Guest Support</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="hero-image">
-            <img
-              src="https://images.unsplash.com/photo-1613490493576-7fde63acd811?w=1400"
-              alt="Villa tropis dengan kolam renang"
-            />
-            <div class="image-label">
-              <span>✦</span>
-              A Place to Unwind
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- VILLA SECTION -->
-      <section id="villas" class="villa-section">
-        <div class="section-container">
-          <div class="section-heading">
-            <div>
-              <span class="eyebrow">OUR COLLECTION</span>
-              <h2>Find Your Perfect <span>Villa.</span></h2>
-            </div>
-            <p>
-              Choose a villa that fits the holiday needs of you and your loved ones.
-            </p>
-          </div>
-
-          
-          <div
-            v-if="villas.length === 0"
-            class="empty-villas"
-          >
-            <h3>Belum Ada Villa</h3>
-
-            <p>
-              Saat ini belum ada unit villa yang dapat ditampilkan.
-              Silakan kembali lagi nanti.
-            </p>
-          </div>
-
-          <div v-else class="villa-grid">
-
-            <VillaCard
-              v-for="villa in villas"
-              :key="villa.id"
-              :villa="villa"
-            />
-
-          </div>
-
-        </div>
-      </section>
-
-      <!-- FACILITIES SECTION -->
-      <section id="facilities" class="facilities-section">
-        <div class="section-container">
-          <div class="facilities-heading">
-            <span class="eyebrow">OUR FACILITIES</span>
-            <h2>Everything You Need <span>To Relax.</span></h2>
-            <p>Various facilities designed for your comfort during your stay.</p>
-          </div>
-
-          <div class="facilities-grid">
-            <div
-              v-for="facility in facilities"
-              :key="facility.title"
-              class="facility-card"
-            >
-              <div class="facility-icon">{{ facility.icon }}</div>
-              <h3>{{ facility.title }}</h3>
-              <p>{{ facility.description }}</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- Section Booking -->
-
-      <section id="booking" class="booking-section">
-        <div class="booking-content">
-          <span class="eyebrow" style="color: #d4e0d9;">READY TO STAY?</span>
-          <h2>Book Your Dream Villa Today.</h2>
+    <!-- HERO SECTION -->
+    <section id="home" class="hero">
+      <div class="hero-container">
+        <div class="hero-content">
+          <span class="eyebrow">✦ YOUR PRIVATE ESCAPE</span>
+          <h1>
+            Experience <span>Comfort</span> & Beautiful Living.
+          </h1>
           <p>
-            Limited availability for the upcoming holiday season. 
-            Secure your private escape now and get the best rate guaranteed.
+            Discover a different kind of stay. Enjoy comfort, privacy, and an unforgettable holiday atmosphere with us.
           </p>
-          <NuxtLink to="#villas" class="button-light">
-            Choose Your Villa →
-          </NuxtLink>
+
+          <div class="hero-actions">
+            <NuxtLink to="booking" class="button button-primary">
+              Book Now →
+            </NuxtLink>
+            <NuxtLink to="#villas" class="button button-outline">
+              Explore Our Villas
+            </NuxtLink>
+          </div>
+
+          <div class="hero-statistics">
+            <div>
+              <strong>05</strong>
+              <span>Villa Units</span>
+            </div>
+            <div>
+              <strong>100%</strong>
+              <span>Private Stay</span>
+            </div>
+            <div>
+              <strong>24/7</strong>
+              <span>Guest Support</span>
+            </div>
+          </div>
         </div>
-      </section>
+
+        <div class="hero-image">
+          <img
+            src="https://images.unsplash.com/photo-1613490493576-7fde63acd811?w=1400"
+            alt="Villa tropis dengan kolam renang"
+            loading="eager"
+          />
+          <div class="image-label">
+            <span>✦</span> A Place to Unwind
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VILLA SECTION -->
+    <section id="villas" class="villa-section">
+      <div class="section-container">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">OUR COLLECTION</span>
+            <h2>Find Your Perfect <span>Villa.</span></h2>
+          </div>
+          <p>
+            Choose a villa that fits the holiday needs of you and your loved ones.
+          </p>
+        </div>
+
+        <!-- ✅ PERBAIKAN 1: Urutan kondisional yang benar (Loading -> Error -> Empty -> Data) -->
+        
+        <!-- 1. Loading State -->
+        <div v-if="villasPending" class="villa-state">
+          <span class="loading-spinner"></span>
+          <p>Sedang mengambil data villa...</p>
+        </div>
+
+        <!-- 2. Error State -->
+        <div v-else-if="villasError" class="villa-state villa-error" role="alert">
+          <h3>Gagal Memuat Villa</h3>
+          <p>Terjadi kesalahan saat mengambil data dari server.</p>
+          <button type="button" class="retry-button" @click="refreshVillas()">
+            Coba Lagi
+          </button>
+        </div>
+
+        <!-- 3. Empty State -->
+        <div v-else-if="villas.length === 0" class="empty-villas">
+          <h3>Belum Ada Villa Tersedia</h3>
+          <p>
+            Saat ini belum ada unit villa yang dapat ditampilkan. 
+            Silakan kembali lagi nanti.
+          </p>
+        </div>
+
+        <!-- 4. Data State -->
+        <div v-else class="villa-grid">
+          <VillaCard
+            v-for="villa in villas"
+            :key="villa.id"
+            :villa="villa"
+          />
+        </div>
+
+      </div>
+    </section>
+
+    <!-- FACILITIES SECTION -->
+    <section id="facilities" class="facilities-section">
+      <div class="section-container">
+        <div class="facilities-heading">
+          <span class="eyebrow">OUR FACILITIES</span>
+          <h2>Everything You Need <span>To Relax.</span></h2>
+          <p>Various facilities designed for your comfort during your stay.</p>
+        </div>
+
+        <div class="facilities-grid">
+          <div
+            v-for="facility in facilities"
+            :key="facility.title"
+            class="facility-card"
+          >
+            <div class="facility-icon" aria-hidden="true">{{ facility.icon }}</div>
+            <h3>{{ facility.title }}</h3>
+            <p>{{ facility.description }}</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- BOOKING SECTION -->
+    <section id="booking" class="booking-section">
+      <div class="booking-content">
+        <span class="eyebrow" style="color: #d4e0d9;">READY TO STAY?</span>
+        <h2>Book Your Dream Villa Today.</h2>
+        <p>
+          Limited availability for the upcoming holiday season. 
+          Secure your private escape now and get the best rate guaranteed.
+        </p>
+        <NuxtLink to="#villas" class="button-light">
+          Choose Your Villa →
+        </NuxtLink>
+      </div>
+    </section>
   </main>
 </template>
 
 <style>
-
 html {
   scroll-behavior: smooth;
 }
 </style>
 
 <style scoped>
+/* =================================
+   STATES (Loading, Error, Empty)
+================================= */
+.villa-state {
+  min-height: 250px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 40px;
+  background: white;
+  border: 1px solid #e9eee9;
+  border-radius: 12px;
+  text-align: center;
+}
+
+.villa-state p {
+  color: #556058; /* ✅ PERBAIKAN 2: Kontras ditingkatkan */
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.villa-error h3 {
+  color: #a52d2d;
+  font-family: Georgia, serif;
+}
+
+.retry-button {
+  padding: 12px 24px;
+  color: white;
+  background: #183d32;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.retry-button:hover {
+  background: #0f2820;
+}
+
 .empty-villas {
-  padding: 45px 20px;
+  padding: 60px 20px;
   background: white;
   border: 1px dashed #cbd8cd;
   border-radius: 12px;
@@ -202,14 +277,19 @@ html {
 .empty-villas h3 {
   color: #183d32;
   font-family: Georgia, serif;
+  font-size: 20px;
+  margin-bottom: 8px;
 }
 
 .empty-villas p {
-  color: #778078;
-  font-size: 13px;
+  color: #556058; /* ✅ PERBAIKAN 2: Kontras ditingkatkan */
+  font-size: 14px;
   line-height: 1.7;
 }
-/* HERO */
+
+/* =================================
+   HERO SECTION
+================================= */
 .hero {
   padding: 75px 24px 90px;
   background: #f5f6f0;
@@ -260,7 +340,6 @@ html {
   gap: 16px; 
   margin-top: 30px;
 }
-
 
 .button {
   display: inline-flex;
@@ -349,7 +428,9 @@ html {
   color: #967045;
 }
 
-/* VILLA SECTION */
+/* =================================
+   VILLA SECTION
+================================= */
 .villa-section {
   padding: 100px 24px;
   background: #fbfaf7;
@@ -390,7 +471,9 @@ html {
   gap: 30px; 
 }
 
-/* FACILITIES SECTION */
+/* =================================
+   FACILITIES SECTION
+================================= */
 .facilities-section {
   padding: 95px 24px;
   background: #f2f5f0;
@@ -419,11 +502,12 @@ html {
   background: white;
   border: 1px solid #e0e8e0; 
   border-radius: 12px;
-  transition: transform 0.2s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .facility-card:hover {
   transform: translateY(-4px);
+  box-shadow: 0 8px 20px rgba(24, 61, 50, 0.06);
 }
 
 .facility-icon {
@@ -444,7 +528,9 @@ html {
   line-height: 1.7;
 }
 
-/* BOOKING SECTION */
+/* =================================
+   BOOKING SECTION
+================================= */
 .booking-section {
   margin: 80px 24px;
   padding: 80px 25px; 
@@ -489,7 +575,9 @@ html {
   transform: translateY(-2px);
 }
 
-/* RESPONSIVE */
+/* =================================
+   RESPONSIVE
+================================= */
 @media (max-width: 950px) {
   .hero-container {
     grid-template-columns: 1fr;
@@ -529,5 +617,20 @@ html {
     margin: 45px 16px;
     padding: 50px 20px;
   }
+}
+
+/* Loading Spinner (jika belum ada di global CSS) */
+.loading-spinner {
+  display: inline-block;
+  width: 24px;
+  height: 24px;
+  border: 3px solid rgba(24, 61, 50, 0.2);
+  border-top-color: #183d32;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 </style>

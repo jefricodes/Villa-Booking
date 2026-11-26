@@ -1,7 +1,7 @@
 
 import { createError, setResponseStatus } from 'h3'
 
-import { getDatabase } from '../utils/database'
+import { getD1 } from '../utils/d1'
 
 import {
   mapVillaRow,
@@ -22,17 +22,17 @@ import {
 } from '../utils/development-only'
 
 import {
-  isSqliteUniqueConstraintError
+  isD1UniqueConstraintError
 } from '../utils/sqlite-errors'
 
 
 export default defineEventHandler(async (event) => {
 
-  // 1. Batasi API mutasi untuk development
+  // 1. Batasi untuk development
   requireDevelopmentOnly()
 
 
-  // 2. Membaca request body
+  // 2. Baca request
   const body = await readBody<unknown>(event)
 
 
@@ -43,12 +43,12 @@ export default defineEventHandler(async (event) => {
   )
 
 
-  // 4. Membuka database
-  const db = getDatabase()
+  // 4. Hubungkan ke D1
+  const db = getD1(event)
 
 
-  // 5. Memeriksa slug yang sudah digunakan
-  const existingVilla = db.prepare(`
+  // 5. Cek slug
+  const existingVilla = await db.prepare(`
 
     SELECT id
 
@@ -56,28 +56,27 @@ export default defineEventHandler(async (event) => {
 
     WHERE slug = ?
 
-  `).get(input.slug)
+    LIMIT 1
+
+  `)
+    .bind(input.slug)
+    .first<{ id: number }>()
 
 
   if (existingVilla) {
 
     throw createError({
-
       statusCode: 409,
-
       statusMessage: 'Slug villa sudah digunakan.'
-
     })
 
   }
 
 
-  // 6. Menyimpan villa
-  let newId: number
-
+  // 6. Insert data ke D1
   try {
 
-    const result = db.prepare(`
+    await db.prepare(`
 
       INSERT INTO villas (
 
@@ -96,64 +95,45 @@ export default defineEventHandler(async (event) => {
 
       )
 
-      VALUES (
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 
-        @slug,
-        @name,
-        @pricePerNight,
-        @capacity,
-        @bedrooms,
-        @bathrooms,
-        @location,
-        @description,
-        @imageUrl,
-        @galleryJson,
-        @amenitiesJson,
-        @isActive
+    `)
+      .bind(
+
+        input.slug,
+
+        input.name,
+
+        input.pricePerNight,
+
+        input.capacity,
+
+        input.bedrooms,
+
+        input.bathrooms,
+
+        input.location,
+
+        input.description,
+
+        input.imageUrl,
+
+        JSON.stringify(input.gallery),
+
+        JSON.stringify(input.amenities),
+
+        input.isActive ? 1 : 0
 
       )
-
-    `).run({
-
-      slug: input.slug,
-
-      name: input.name,
-
-      pricePerNight: input.pricePerNight,
-
-      capacity: input.capacity,
-
-      bedrooms: input.bedrooms,
-
-      bathrooms: input.bathrooms,
-
-      location: input.location,
-
-      description: input.description,
-
-      imageUrl: input.imageUrl,
-
-      galleryJson: JSON.stringify(input.gallery),
-
-      amenitiesJson: JSON.stringify(input.amenities),
-
-      isActive: input.isActive ? 1 : 0
-
-    })
-
-    newId = Number(result.lastInsertRowid)
+      .run()
 
   } catch (error) {
 
-    // Database tetap menjadi penjaga UNIQUE terakhir
-    if (isSqliteUniqueConstraintError(error)) {
+    if (isD1UniqueConstraintError(error)) {
 
       throw createError({
-
         statusCode: 409,
-
         statusMessage: 'Slug villa sudah digunakan.'
-
       })
 
     }
@@ -163,37 +143,38 @@ export default defineEventHandler(async (event) => {
   }
 
 
-  // 7. Mengambil data yang baru disimpan
-  const row = db.prepare(`
+  // 7. Ambil kembali villa
+  const row = await db.prepare(`
 
     SELECT
       ${VILLA_SELECT_COLUMNS}
 
     FROM villas
 
-    WHERE id = ?
+    WHERE slug = ?
 
-  `).get(newId) as VillaRow | undefined
+    LIMIT 1
+
+  `)
+    .bind(input.slug)
+    .first<VillaRow>()
 
 
   if (!row) {
 
     throw createError({
-
       statusCode: 500,
-
-      statusMessage: 'Data villa gagal dibaca setelah disimpan.'
-
+      statusMessage: 'Villa gagal dibaca setelah disimpan.'
     })
 
   }
 
 
-  // 8. Mengatur HTTP status 201
+  // 8. Status HTTP 201
   setResponseStatus(event, 201)
 
 
-  // 9. Mengirim response
+  // 9. Response
   return {
 
     success: true,

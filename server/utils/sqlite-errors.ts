@@ -1,5 +1,5 @@
 
-export function isSqliteUniqueConstraintError(
+export function isD1UniqueConstraintError(
   error: unknown
 ): boolean {
 
@@ -7,10 +7,23 @@ export function isSqliteUniqueConstraintError(
     return false
   }
 
-  if (!('code' in error)) {
+  return error.message.includes(
+    'UNIQUE constraint failed'
+  )
+
+}
+
+
+export function isD1ForeignKeyError(
+  error: unknown
+): boolean {
+
+  if (!(error instanceof Error)) {
     return false
   }
 
-  return error.code === 'SQLITE_CONSTRAINT_UNIQUE'
+  return error.message.includes(
+    'FOREIGN KEY constraint failed'
+  )
 
 }

@@ -1,5 +1,5 @@
 
-import { getDatabase } from '../../utils/database'
+import { getD1 } from '../../utils/d1'
 
 import {
   mapVillaRow,
@@ -10,19 +10,19 @@ import {
 import { parseVillaId } from '../../utils/parse-villa-id'
 
 
-export default defineEventHandler((event) => {
+export default defineEventHandler(async (event) => {
 
-  // 1. Membaca ID dari URL
+  // 1. Ambil ID dari URL
   const rawId = getRouterParam(event, 'id')
 
-  // 2. Memvalidasi ID
+  // 2. Validasi ID
   const id = parseVillaId(rawId)
 
-  // 3. Membuka database
-  const db = getDatabase()
+  // 3. Ambil binding D1
+  const db = getD1(event)
 
-  // 4. Mengambil villa dari SQLite
-  const row = db.prepare(`
+  // 4. Cari villa aktif
+  const row = await db.prepare(`
 
     SELECT
       ${VILLA_SELECT_COLUMNS}
@@ -32,30 +32,37 @@ export default defineEventHandler((event) => {
     WHERE id = ?
       AND is_active = 1
 
-  `).get(id) as VillaRow | undefined
+    LIMIT 1
+
+  `)
+    .bind(id)
+    .first<VillaRow>()
 
 
-  // 5. Jika tidak ditemukan
+  // 5. Villa tidak ditemukan
   if (!row) {
 
     throw createError({
-
       statusCode: 404,
-
       statusMessage: 'Villa tidak ditemukan.'
-
     })
 
   }
 
 
-  // 6. Mengembalikan data
+  // 6. Mapping data database
+  const villa = mapVillaRow(row)
+
+  const {
+    isActive,
+    ...publicVilla
+  } = villa
+
+
+  // 7. Return JSON
   return {
-
     success: true,
-
-    data: mapVillaRow(row)
-
+    data: publicVilla
   }
 
 })
