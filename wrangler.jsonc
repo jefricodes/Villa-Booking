@@ -17,5 +17,12 @@
 			"database_id": "4cceff4b-cf75-47af-ad8a-ca6a16ef814a",
 			"migrations_dir": "migrations"
 		}
+	],
+
+	"r2_buckets": [
+		{
+			"binding": "R2",
+			"bucket_name": "villa-booking-image"
+		}
 	]
 }

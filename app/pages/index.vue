@@ -4,18 +4,13 @@ import type { VillasApiResponse } from '#shared/types/villa-api'
 // ======================================
 // 1. DATA FETCHING (Nuxt 3 Best Practice)
 // ======================================
+// ✅ PAKAI COMPOSABLE
 const {
-  data: villaResponse,
-  pending: villasPending,
-  error: villasError,
-  refresh: refreshVillas
-} = await useFetch<VillasApiResponse>('/api/villas', {
-  key: 'public-villas',
-  default: () => ({ success: true, count: 0, data: [] })
-})
-
-// Computed property untuk mengambil array villa dengan aman
-const villas = computed(() => villaResponse.value?.data ?? [])
+  villas,
+  villasPending,
+  villasError,
+  refreshVillas
+} = useVillas()
 
 // ======================================
 // 2. DATA FASILITAS (Dengan Typing yang Jelas)

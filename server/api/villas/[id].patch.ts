@@ -9,27 +9,25 @@ import {
   type VillaRow
 } from '../../utils/villa-mapper'
 
-import {
-  updateVillaStatusSchema
-} from '../../utils/villa-validation'
+import { updateVillaStatusSchema } from '../../utils/villa-validation'
 
-import {
-  validateBody
-} from '../../utils/validate-body'
+import { validateBody } from '../../utils/validate-body'
 
-import {
-  parseVillaId
-} from '../../utils/parse-villa-id'
+import { parseVillaId } from '../../utils/parse-villa-id'
 
-import {
-  requireDevelopmentOnly
-} from '../../utils/development-only'
+
+import { requireAdmin } from '../../utils/admin-session-auth'
+
+import { requireSameOrigin } from '../../utils/admin-security'
 
 
 export default defineEventHandler(async (event) => {
 
-  // 1. Development only
-  requireDevelopmentOnly()
+// Pastikan request berasal dari website kita sendiri.
+requireSameOrigin(event)
+
+// Pastikan pengguna sudah login sebagai admin.
+await requireAdmin(event)
 
 
   // 2. Membaca ID

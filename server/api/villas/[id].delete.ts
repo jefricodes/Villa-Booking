@@ -7,13 +7,14 @@ import {
   parseVillaId
 } from '../../utils/parse-villa-id'
 
-import {
-  requireDevelopmentOnly
-} from '../../utils/development-only'
 
 import {
   isD1ForeignKeyError
-} from '../../utils/sqlite-errors'
+} from '../../utils/d1-errors'
+
+import { requireAdmin } from '../../utils/admin-session-auth'
+
+import { requireSameOrigin } from '../../utils/admin-security'
 
 
 interface VillaIdentity {
@@ -24,8 +25,11 @@ interface VillaIdentity {
 
 export default defineEventHandler(async (event) => {
 
-  // 1. Development only
-  requireDevelopmentOnly()
+// Pastikan request berasal dari website kita sendiri.
+requireSameOrigin(event)
+
+// Pastikan pengguna sudah login sebagai admin.
+await requireAdmin(event)
 
 
   // 2. Membaca ID

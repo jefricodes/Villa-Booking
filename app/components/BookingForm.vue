@@ -186,6 +186,17 @@ const formatBookingDate = (dateStr: string) => {
   })
 }
 
+// ✅ PERBAIKAN: pesan bentrok yang menyebut tanggal check-in & check-out user
+const buildConflictMessage = (): string => {
+  const inDate = formatBookingDate(form.value.checkIn)
+  const outDate = formatBookingDate(form.value.checkOut)
+
+  return (
+    `Tanggal ${inDate} – ${outDate} sudah dipesan. ` +
+    `Silakan pilih tanggal lain.`
+  )
+}
+
 const validateForm = (): boolean => {
   const newErrors: Record<string, string> = {}
 
@@ -269,17 +280,17 @@ const handleSubmit = async () => {
       }
     )
 
-    availabilityMessage.value = response.message
-
-    availabilityStatus.value = response.available
-      ? 'available'
-      : 'unavailable'
+    availabilityStatus.value = response.available ? 'available' : 'unavailable'
 
     if (!response.available) {
-      errors.value.checkOut = response.message
+      // ✅ PERBAIKAN: pesan jelas menyebut rentang tanggal yang dipilih user
+      errors.value.checkOut = buildConflictMessage()
+      availabilityMessage.value = ''
       return
     }
 
+    // ✅ Tersedia → tampilkan banner hijau sukses
+    availabilityMessage.value = response.message
     serverQuote.value = response
     isPreviewVisible.value = true
 
@@ -395,43 +406,6 @@ onMounted(() => {
   today.value = getTodayString()
 })
 
-// ✅ PERBAIKAN: state + fungsi untuk success screen
-const copied = ref(false)
-
-const copyBookingCode = async () => {
-  const code = bookingResult.value?.bookingCode
-  if (!code) return
-  try {
-    await navigator.clipboard.writeText(code)
-    copied.value = true
-    setTimeout(() => (copied.value = false), 2000)
-  } catch {
-    // fallback untuk browser lama
-    const ta = document.createElement('textarea')
-    ta.value = code
-    document.body.appendChild(ta)
-    ta.select()
-    document.execCommand('copy')
-    document.body.removeChild(ta)
-    copied.value = true
-    setTimeout(() => (copied.value = false), 2000)
-  }
-}
-
-// ✅ PERBAIKAN: warna badge sesuai status
-const statusClass = computed(() => {
-  const s = (bookingResult.value?.status ?? '').toLowerCase()
-  if (s === 'confirmed') return 'is-confirmed'
-  if (s === 'cancelled') return 'is-cancelled'
-  return 'is-pending' // default: pending
-})
-
-const statusLabel = computed(() => {
-  const s = (bookingResult.value?.status ?? '').toLowerCase()
-  if (s === 'confirmed') return 'Terkonfirmasi'
-  if (s === 'cancelled') return 'Dibatalkan'
-  return 'Menunggu Konfirmasi'
-})
 </script>
 
 <template>
@@ -452,76 +426,11 @@ const statusLabel = computed(() => {
         <p>Saat ini belum ada unit villa yang dapat dipesan. Silakan kembali lagi nanti.</p>
       </div>
 
-      <!-- ✅ STATE 2: SUCCESS (redesign premium) -->
-      <section v-if="bookingResult" class="booking-success" aria-live="polite">
-        <div class="success-hero">
-          <div class="success-icon" aria-hidden="true">
-            <svg viewBox="0 0 52 52">
-              <circle cx="26" cy="26" r="24" fill="none" stroke="#31855a" stroke-width="3"/>
-              <path fill="none" stroke="#31855a" stroke-width="4" stroke-linecap="round"
-                    d="M14 27l7 7 16-16"/>
-            </svg>
-          </div>
-          <h3>Reservasi Berhasil Dibuat!</h3>
-          <p>
-            Terima kasih, <strong>{{ bookingResult.guestName }}</strong>.
-            Data reservasi kamu sudah kami terima.
-          </p>
-          <span class="status-badge" :class="statusClass">
-            <i></i> {{ statusLabel }}
-          </span>
-        </div>
+      <!-- ✅ STATE 2: SUCCESS (pakai komponen) -->
+      <div v-if="bookingResult" class="booking-success-wrapper" aria-live="polite">
+        <BookingConfirmation :booking="bookingResult" />
 
-        <div class="booking-code-box">
-          <div class="booking-code-info">
-            <small>Kode Reservasi</small>
-            <strong class="booking-code">{{ bookingResult.bookingCode }}</strong>
-          </div>
-          <button type="button" class="copy-button" @click="copyBookingCode">
-            {{ copied ? '✓ Tersalin' : 'Salin Kode' }}
-          </button>
-        </div>
-
-        <div class="success-grid">
-          <div class="success-item">
-            <span>Villa</span>
-            <strong>{{ bookingResult.villaName }}</strong>
-          </div>
-          <div class="success-item">
-            <span>Jumlah Tamu</span>
-            <strong>{{ bookingResult.guestCount }} orang</strong>
-          </div>
-          <div class="success-item">
-            <span>Check-in</span>
-            <strong>{{ formatBookingDate(bookingResult.checkIn) }}</strong>
-          </div>
-          <div class="success-item">
-            <span>Check-out</span>
-            <strong>{{ formatBookingDate(bookingResult.checkOut) }}</strong>
-          </div>
-          <div class="success-item">
-            <span>Durasi</span>
-            <strong>{{ bookingResult.nights }} malam</strong>
-          </div>
-          <div class="success-item">
-            <span>Telepon</span>
-            <strong>{{ bookingResult.guestPhone }}</strong>
-          </div>
-          <div v-if="bookingResult.guestEmail" class="success-item full">
-            <span>Email</span>
-            <strong>{{ bookingResult.guestEmail }}</strong>
-          </div>
-        </div>
-
-        <div class="success-total">
-          <span>Total Reservasi</span>
-          <strong>{{ formatRupiah(bookingResult.totalPrice) }}</strong>
-        </div>
-
-        <p class="success-note">
-          Simpan kode reservasi di atas untuk keperluan komunikasi dan pembayaran selanjutnya.
-        </p>
-
+        <!-- Tombol navigasi = tanggung jawab parent (bukan komponen) -->
         <div class="success-actions">
           <NuxtLink to="/#villas" class="success-btn success-btn-primary">
             ← Lihat Villa Lain
@@ -530,7 +439,7 @@ const statusLabel = computed(() => {
             Kembali ke Beranda
           </NuxtLink>
         </div>
-      </section>
+      </div>
 
       <!-- ✅ STATE 3: FORM (v-if mandiri) -->
       <form
@@ -788,174 +697,21 @@ const statusLabel = computed(() => {
 
 <style scoped>
 
-/* =================================
-   BOOKING SUCCESS (redesign)
-================================= */
-.booking-success {
-  margin-top: 10px;
-  padding: 40px 35px;
-  background: white;
-  border: 1px solid #d7e5d9;
-  border-radius: 16px;
-  box-shadow: 0 14px 40px rgba(24, 61, 50, 0.08);
-  animation: successIn 0.4s ease;
+/* ✅ PERBAIKAN: wrapper success (komponen + tombol) */
+.booking-success-wrapper { margin-top: 10px; }
+
+.success-actions { display: flex; gap: 12px; margin-top: 18px; }
+.success-btn {
+  flex: 1; padding: 14px; border-radius: 9px; text-align: center;
+  text-decoration: none; font-size: 13px; font-weight: 600; transition: all 0.2s ease;
 }
+.success-btn-primary { background: #183d32; color: white; }
+.success-btn-primary:hover { background: #0f2820; transform: translateY(-1px); }
+.success-btn-outline { background: transparent; color: #183d32; border: 2px solid #183d32; }
+.success-btn-outline:hover { background: #183d32; color: white; }
 
-@keyframes successIn {
-  from { opacity: 0; transform: translateY(16px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-.success-hero {
-  text-align: center;
-  margin-bottom: 28px;
-}
-
-.success-icon {
-  width: 64px;
-  height: 64px;
-  margin: 0 auto 16px;
-}
-
-.success-icon svg { width: 100%; height: 100%; }
-
-.success-icon circle {
-  stroke-dasharray: 151;
-  stroke-dashoffset: 151;
-  animation: drawCircle 0.5s ease forwards;
-}
-
-.success-icon path {
-  stroke-dasharray: 36;
-  stroke-dashoffset: 36;
-  animation: drawCheck 0.4s ease 0.45s forwards;
-}
-
-@keyframes drawCircle { to { stroke-dashoffset: 0; } }
-@keyframes drawCheck  { to { stroke-dashoffset: 0; } }
-
-.success-hero h3 {
-  margin: 0 0 8px;
-  color: #183d32;
-  font-family: Georgia, serif;
-  font-size: 24px;
-}
-
-.success-hero p {
-  margin: 0 auto 14px;
-  max-width: 420px;
-  color: #556058;
-  font-size: 14px;
-  line-height: 1.7;
-}
-
-.success-hero p strong { color: #183d32; }
-
-/* Status badge */
-.status-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 6px 14px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.3px;
-}
-
-.status-badge i {
-  width: 7px; height: 7px;
-  border-radius: 50%;
-  background: currentColor;
-}
-
-.status-badge.is-pending   { color: #9a6a1f; background: #fdf3e0; }
-.status-badge.is-confirmed { color: #286c4a; background: #edf7ef; }
-.status-badge.is-cancelled { color: #a52d2d; background: #fff0f0; }
-
-/* Booking code */
-.booking-code-box {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 18px 22px;
-  margin-bottom: 26px;
-  background: #f5f7f3;
-  border: 1px dashed #cbd8cd;
-  border-radius: 12px;
-}
-
-.booking-code-info small {
-  display: block;
-  color: #869087;
-  font-size: 11px;
-  margin-bottom: 4px;
-}
-
-.booking-code {
-  color: #183d32;
-  font-family: 'Courier New', monospace;
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-}
-
-.copy-button {
-  padding: 9px 16px;
-  color: white;
-  background: #183d32;
-  border: none;
-  border-radius: 8px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background 0.2s;
-}
-
-.copy-button:hover { background: #0f2820; }
-
-/* Detail grid */
-.success-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 18px 24px;
-  padding-bottom: 22px;
-  border-bottom: 1px solid #e9eee9;
-}
-
-.success-item { display: flex; flex-direction: column; gap: 5px; }
-.success-item.full { grid-column: 1 / -1; }
-.success-item span { color: #89918b; font-size: 11px; }
-.success-item strong {
-  color: #26352c;
-  font-size: 14px;
-  overflow-wrap: anywhere;
-}
-
-/* Total */
-.success-total {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 20px 0 6px;
-}
-
-.success-total span { color: #556058; font-size: 14px; }
-
-.success-total strong {
-  color: #183d32;
-  font-family: Georgia, serif;
-  font-size: 30px;
-}
-
-.success-note {
-  margin: 12px 0 24px;
-  color: #869087;
-  font-size: 12px;
-  line-height: 1.6;
+@media (max-width: 600px) {
+  .success-actions { flex-direction: column; }
 }
 
 /* Actions */
@@ -1010,13 +766,7 @@ const statusLabel = computed(() => {
   font-size: 11px;
 }
 
-.booking-success {
-  border-color: #31855a;
-}
 
-.booking-success .preview-heading > span {
-  background: #31855a;
-}
 /* ✅ PERBAIKAN 5: CSS tetap sama, hanya dirapikan indentasinya agar konsisten */
 .booking-section {
   padding: 90px 24px;

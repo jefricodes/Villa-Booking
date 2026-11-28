@@ -18,18 +18,21 @@ import {
 } from '../utils/validate-body'
 
 import {
-  requireDevelopmentOnly
-} from '../utils/development-only'
-
-import {
   isD1UniqueConstraintError
-} from '../utils/sqlite-errors'
+} from '../utils/d1-errors'
+
+import { requireAdmin } from '../utils/admin-session-auth'
+
+import { requireSameOrigin } from '../utils/admin-security'
 
 
 export default defineEventHandler(async (event) => {
 
-  // 1. Batasi untuk development
-  requireDevelopmentOnly()
+// Pastikan request berasal dari website kita sendiri.
+requireSameOrigin(event)
+
+// Pastikan pengguna sudah login sebagai admin.
+await requireAdmin(event)
 
 
   // 2. Baca request

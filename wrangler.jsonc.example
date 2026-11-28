@@ -1,0 +1,20 @@
+// wrangler.jsonc.example
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "villa-booking",
+  "main": ".output/server/index.mjs",
+  "compatibility_date": "2026-11-24",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": ".output/public",
+    "binding": "ASSETS"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "villa-booking-dev",
+      "database_id": "GANTI_DENGAN_ID_DARI_DASHBOARD_CLOUDFLARE",
+      "migrations_dir": "migrations"
+    }
+  ]
+}

@@ -1,51 +1,71 @@
+# ============================================
 # Nuxt dev/build outputs
-.output
-.data
-.nuxt
-.nitro
-.cache
-dist
+# ============================================
+.output/
+.nuxt/
+.nitro/
+.cache/
+dist/
+.data/
 
+# ============================================
 # Node dependencies
-node_modules
+# ============================================
+node_modules/
 
+# ============================================
 # Logs
-logs
+# ============================================
+logs/
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 
-# Misc
-.DS_Store
-.fleet
-.idea
-
-# Local env files
+# ============================================
+# Environment variables
+# ============================================
 .env
 .env.*
 !.env.example
 
-# Local database
-/data/
+# ============================================
+# Local Cloudflare development
+# ============================================
+.wrangler/
+.dev.vars
+.dev.vars.*
 
-# SQLite files
+
+# ============================================
+# Local database files
+# ============================================
 *.sqlite
 *.sqlite3
 *.sqlite-shm
 *.sqlite-wal
-
-# Environment variables
-.env
-
-# Local legacy SQLite database
+*.sqlite-journal
 data/
 
-# Cloudflare local development state
-.wrangler/
+# ============================================
+# IDE & Editor
+# ============================================
+.vscode/
+!.vscode/extensions.json
+.fleet/
+.idea/
+*.swp
+*.swo
+*~
 
-# Local Cloudflare variables
-.dev.vars
-.dev.vars.*
+# ============================================
+# OS files
+# ============================================
+.DS_Store
+Thumbs.db
 
-# Local environment
-.env
-.env.*
-!.env.example
+# ============================================
+# Backup files
+# ============================================
+backup/

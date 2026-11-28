@@ -1,1 +1,0 @@
-export { demoBookings } from '#shared/data/demo-bookings'

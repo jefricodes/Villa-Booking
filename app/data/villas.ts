@@ -1,1 +1,0 @@
-export { villas } from '#shared/data/villas'
