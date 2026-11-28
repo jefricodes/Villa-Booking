@@ -15,7 +15,8 @@
 			"binding": "DB",
 			"database_name": "villa-booking-dev",
 			"database_id": "4cceff4b-cf75-47af-ad8a-ca6a16ef814a",
-			"migrations_dir": "migrations"
+			"migrations_dir": "migrations",
+			"remote": true
 		}
 	],
 
